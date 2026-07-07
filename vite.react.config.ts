@@ -14,12 +14,12 @@ export default defineConfig({
     outDir: 'dist/react',
     emptyOutDir: true,
     rollupOptions: {
-      external: ['react', 'react-dom', '@wysiwyg-sa/fable-editor'],
+      external: ['react', 'react-dom', 'fable-editor'],
       output: {
         globals: {
           react: 'React',
           'react-dom': 'ReactDOM',
-          '@wysiwyg-sa/fable-editor': 'FableEditorCore'
+          'fable-editor': 'FableEditorCore'
         }
       }
     }
