@@ -21,7 +21,7 @@ A rich text editor packaged as an npm library with first-class React and Angular
 ## Install
 
 ```bash
-npm install @an-sajinsatheesan/fable-editor
+npm install @wysiwyg-sa/fable-editor
 ```
 
 > **Note:** the package ships framework wrappers as optional peer dependencies. Install React or Angular dependencies only if you use those wrappers.
@@ -31,8 +31,8 @@ npm install @an-sajinsatheesan/fable-editor
 Import the CSS once in your app, then create an editor instance:
 
 ```ts
-import '@an-sajinsatheesan/fable-editor/style.css';
-import { FableEditor } from '@an-sajinsatheesan/fable-editor';
+import '@wysiwyg-sa/fable-editor/style.css';
+import { FableEditor } from '@wysiwyg-sa/fable-editor';
 
 const editor = new FableEditor({
   target: document.getElementById('editor')!,
@@ -74,8 +74,8 @@ editor.destroy();
 ## React
 
 ```tsx
-import '@an-sajinsatheesan/fable-editor/style.css';
-import { FableEditor } from '@an-sajinsatheesan/fable-editor/react';
+import '@wysiwyg-sa/fable-editor/style.css';
+import { FableEditor } from '@wysiwyg-sa/fable-editor/react';
 
 function App() {
   const [value, setValue] = useState('<p><br></p>');
@@ -100,14 +100,14 @@ Add to `angular.json` styles:
 ```json
 "styles": [
   "src/styles.css",
-  "node_modules/@an-sajinsatheesan/fable-editor/style.css"
+  "node_modules/@wysiwyg-sa/fable-editor/style.css"
 ]
 ```
 
 Import the module:
 
 ```ts
-import { FableEditorModule } from '@an-sajinsatheesan/fable-editor/angular';
+import { FableEditorModule } from '@wysiwyg-sa/fable-editor/angular';
 
 @NgModule({
   imports: [FableEditorModule]

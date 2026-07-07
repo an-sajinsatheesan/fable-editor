@@ -1,5 +1,5 @@
 {
-  "name": "@an-sajinsatheesan/fable-editor",
+  "name": "@wysiwyg-sa/fable-editor",
   "version": "1.0.0",
   "description": "FableEditor — a rich text editor with React and Angular wrappers",
   "author": "An Sajin Satheesan <an.sajinsatheesan@gmail.com>",
@@ -18,7 +18,7 @@
       "types": "./dist/react/index.d.ts"
     },
     "./angular": {
-      "default": "./dist/angular/fesm2022/an-sajinsatheesan-fable-editor.mjs",
+      "default": "./dist/angular/fesm2022/wysiwyg-sa-fable-editor.mjs",
       "types": "./dist/angular/index.d.ts"
     },
     "./style.css": "./style.css"

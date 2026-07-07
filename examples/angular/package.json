@@ -19,7 +19,7 @@
     "@angular/platform-browser-dynamic": "^18.2.0",
     "@angular/router": "^18.2.0",
     "rxjs": "~7.8.0",
-    "@an-sajinsatheesan/fable-editor": "file:../../tmp/an-sajinsatheesan-fable-editor-1.0.0.tgz",
+    "@wysiwyg-sa/fable-editor": "file:../../tmp/wysiwyg-sa-fable-editor-1.0.0.tgz",
     "tslib": "^2.3.0",
     "zone.js": "~0.14.10"
   },

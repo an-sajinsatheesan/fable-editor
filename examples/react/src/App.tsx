@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
-import '@an-sajinsatheesan/fable-editor/style.css';
-import { FableEditor } from '@an-sajinsatheesan/fable-editor/react';
-import type { FableEditorApi } from '@an-sajinsatheesan/fable-editor';
+import '@wysiwyg-sa/fable-editor/style.css';
+import { FableEditor } from '@wysiwyg-sa/fable-editor/react';
+import type { FableEditorApi } from '@wysiwyg-sa/fable-editor';
 
 function App() {
   const [value, setValue] = useState('<p><strong>React wrapper</strong> is working.</p>');
