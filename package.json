@@ -1,0 +1,105 @@
+{
+  "name": "@an-sajinsatheesan/fable-editor",
+  "version": "1.0.0",
+  "description": "FableEditor — a rich text editor with React and Angular wrappers",
+  "author": "An Sajin Satheesan <an.sajinsatheesan@gmail.com>",
+  "main": "./dist/core/index.cjs",
+  "module": "./dist/core/index.mjs",
+  "types": "./dist/core/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/core/index.mjs",
+      "require": "./dist/core/index.cjs",
+      "types": "./dist/core/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react/index.mjs",
+      "require": "./dist/react/index.cjs",
+      "types": "./dist/react/index.d.ts"
+    },
+    "./angular": {
+      "default": "./dist/angular/fesm2022/an-sajinsatheesan-fable-editor.mjs",
+      "types": "./dist/angular/index.d.ts"
+    },
+    "./style.css": "./style.css"
+  },
+  "files": [
+    "dist",
+    "style.css",
+    "README.md"
+  ],
+  "scripts": {
+    "build:core": "vite build --config vite.core.config.ts && cp src/core/editor.css dist/core/editor.css && cp src/core/editor.css style.css",
+    "build:react": "vite build --config vite.react.config.ts",
+    "build:angular": "ng-packagr -p ng-package.json && rm -f dist/angular/package.json",
+    "build": "npm run build:core && npm run build:react && npm run build:angular",
+    "dev": "vite --open /demo/index.html",
+    "demo": "vite --open /demo/index.html",
+    "demo:react": "cd examples/react && npm run dev",
+    "demo:angular": "cd examples/angular && npm start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "editor",
+    "wysiwyg",
+    "fable-editor",
+    "react",
+    "angular",
+    "rich-text-editor"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@angular/common": ">=14.0.0",
+    "@angular/core": ">=14.0.0",
+    "@angular/forms": ">=14.0.0",
+    "react": ">=16.8.0",
+    "react-dom": ">=16.8.0",
+    "rxjs": ">=6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "@angular/core": {
+      "optional": true
+    },
+    "@angular/common": {
+      "optional": true
+    },
+    "@angular/forms": {
+      "optional": true
+    },
+    "rxjs": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@angular/common": "^18.0.0",
+    "@angular/compiler": "^18.0.0",
+    "@angular/compiler-cli": "^18.0.0",
+    "@angular/core": "^18.0.0",
+    "@angular/forms": "^18.0.0",
+    "@playwright/test": "^1.61.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "jsdom": "^29.1.1",
+    "ng-packagr": "^18.0.0",
+    "playwright": "^1.61.1",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "rxjs": "^7.8.0",
+    "tslib": "^2.6.0",
+    "typescript": "^5.4.5",
+    "vite": "^5.3.0",
+    "vite-plugin-dts": "^3.9.0",
+    "vitest": "^4.1.9"
+  }
+}

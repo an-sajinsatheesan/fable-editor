@@ -1,0 +1,18 @@
+<div style="max-width: 1000px; margin: 30px auto; padding: 0 20px;">
+  <h2>FableEditor — Angular test</h2>
+  <div style="margin-bottom: 12px;">
+    <button (click)="language = 'en'" [disabled]="language === 'en'">English</button>
+    <button (click)="language = 'ar'" [disabled]="language === 'ar'">العربية</button>
+    <button (click)="logContent(editor)">Log content</button>
+    <button (click)="editor.setContent('<p>Reset content</p>')">Reset</button>
+  </div>
+  <fable-editor
+    #editor
+    [value]="content"
+    (editorChange)="onChange($event)"
+    [language]="language"
+    [height]="400"
+  ></fable-editor>
+  <h3>HTML output</h3>
+  <pre style="background: #f4f4f4; padding: 12px; border-radius: 6px;">{{ content }}</pre>
+</div>

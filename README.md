@@ -1,0 +1,175 @@
+# FableEditor
+
+A rich text editor packaged as an npm library with first-class React and Angular wrappers. Built from the original standalone `fable-editor.html`/`fable-editor.js` demo, preserving the full feature set.
+
+## Features
+
+| Feature | Details |
+|---|---|
+| Toolbar & menubar | Configurable via `toolbar`/`menubar` strings (`\|`-separated groups), or use the built-in defaults. Menus: File, Edit, View, Insert, Format, Tools, Table, Help |
+| Tables | Resize handles, row/column insert & delete, cell/row/column/table properties, context toolbar |
+| Paste handling | PowerPaste-style clean paste from Word / Google Docs / Excel |
+| Internationalization | English / Arabic, automatic RTL/LTR switching |
+| Fonts & formatting | Configurable font list (`fontFamilyFormats`), sizes, line-height, word-spacing, text/background color, change case |
+| Custom content styling | `contentStyle` injects scoped CSS into the editable area (e.g. default font/size) |
+| Images | Placeholder upload UI, drag-and-drop, configurable accepted file types (`imageFileTypes`), pluggable async upload handler |
+| Documents | Import `.docx` files, source-code view, print preview |
+| Productivity | Undo/redo, revision history, autosave draft restore, word count, special characters, page breaks |
+| Fullscreen | Toggle fullscreen editing |
+| Help | Built-in shortcuts/help dialog |
+
+## Install
+
+```bash
+npm install @an-sajinsatheesan/fable-editor
+```
+
+> **Note:** the package ships framework wrappers as optional peer dependencies. Install React or Angular dependencies only if you use those wrappers.
+
+## Vanilla / Core
+
+Import the CSS once in your app, then create an editor instance:
+
+```ts
+import '@an-sajinsatheesan/fable-editor/style.css';
+import { FableEditor } from '@an-sajinsatheesan/fable-editor';
+
+const editor = new FableEditor({
+  target: document.getElementById('editor')!,
+  language: 'en',           // 'en' | 'ar'
+  height: 400,
+  initialContent: '<p><br></p>',
+  onChange: (html) => console.log(html)
+});
+
+// API
+editor.getContent();
+editor.setContent('<p>Hello</p>');
+editor.insertContent('<strong>bold</strong>');
+editor.setLanguage('ar');
+editor.focus();
+editor.destroy();
+```
+
+### `init` options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `target` | `HTMLElement` | — | Required. Element to mount the editor into. |
+| `language` | `'en' \| 'ar'` | `'en'` | UI language; also switches text direction. |
+| `height` | `number` | `302` | Editable area height in px. |
+| `initialContent` | `string` | `'<p><br></p>'` | Starting HTML content. |
+| `menubar` | `boolean \| string` | `true` | `true`/omitted = default menu set. `false` = hidden. A string is a space-separated subset/reorder, e.g. `'file edit view insert format tools table help'`. |
+| `toolbar` | `boolean \| string` | `true` | `true`/omitted = default toolbar. `false` = hidden. A string lays out the toolbar: `\|` separates groups, spaces separate items, e.g. `'undo redo \| bold italic'`. |
+| `statusbar` | `boolean` | `true` | Show/hide the status bar. |
+| `readonly` | `boolean` | `false` | Disable editing. |
+| `fontFamilyFormats` | `[string, string][]` | built-in list | Overrides the font dropdown. Tuples of `[displayName, cssFontFamilyValue]`. |
+| `contentStyle` | `string` | — | Custom CSS for the editable area. The literal word `body` is scoped to this editor instance; other selectors are used verbatim (your responsibility to scope). |
+| `imageFileTypes` | `string[]` | common image MIME types | `accept` list for the native image file picker. |
+| `imageUploadHandler` | `(file: File) => Promise<string>` | — | Resolve with a URL after uploading; omit to inline images as base64. |
+| `onImageUploadError` | `(error, file) => void` | — | Called when `imageUploadHandler` rejects. |
+| `draftKey` | `string` | current page path | Storage key suffix for autosaved drafts. |
+| `onChange` / `onReady` | functions | — | Content-change and ready callbacks (usually set by the React/Angular wrapper instead). |
+
+## React
+
+```tsx
+import '@an-sajinsatheesan/fable-editor/style.css';
+import { FableEditor } from '@an-sajinsatheesan/fable-editor/react';
+
+function App() {
+  const [value, setValue] = useState('<p><br></p>');
+
+  return (
+    <FableEditor
+      value={value}
+      onChange={setValue}
+      language="en"
+      height={400}
+    />
+  );
+}
+```
+
+Props: `value`, `defaultValue`, `onChange`, `language`, `height`, `menubar`, `toolbar`, `statusbar`, `readonly`, `fontFamilyFormats`, `contentStyle`, `imageFileTypes`, `imageUploadHandler`, `onImageUploadError`, `init`, `className`, `style` (see the [`init` options](#init-options) table above — every option is also a top-level prop). A ref exposes `getContent`, `setContent`, `insertContent`, `setLanguage`, `focus`, `destroy`.
+
+## Angular
+
+Add to `angular.json` styles:
+
+```json
+"styles": [
+  "src/styles.css",
+  "node_modules/@an-sajinsatheesan/fable-editor/style.css"
+]
+```
+
+Import the module:
+
+```ts
+import { FableEditorModule } from '@an-sajinsatheesan/fable-editor/angular';
+
+@NgModule({
+  imports: [FableEditorModule]
+})
+export class AppModule {}
+```
+
+Use in a template:
+
+```html
+<fable-editor [(ngModel)]="content" language="en" [height]="400"></fable-editor>
+```
+
+Inputs: `language`, `height`, `menubar`, `toolbar`, `statusbar`, `readonly`, `init`. `menubar`/`toolbar` accept a string directly (e.g. `[toolbar]="'undo redo | bold italic'"`); `fontFamilyFormats`, `contentStyle`, `imageFileTypes`, `imageUploadHandler`, and `onImageUploadError` aren't top-level inputs — pass them via `[init]="{ contentStyle: '...' }"` (see the [`init` options](#init-options) table above). Outputs: `editorChange`, `editorReady`. Works with `ngModel` and `formControlName`.
+
+## Development & testing
+
+```bash
+npm install
+npm run build      # builds core, react, and angular
+npm test           # automated core tests (Vitest + jsdom)
+```
+
+### Manual smoke tests
+
+```bash
+# Vanilla demo
+npm run demo
+# open http://localhost:5173/demo/index.html
+
+# React example
+npm run demo:react
+# open http://localhost:5173
+
+# Angular example
+npm run demo:angular
+# open http://localhost:4200
+```
+
+> Run `npm run build` before the Angular demo so the library files are up to date.
+
+## Project layout
+
+```
+src/
+  core/         # framework-agnostic editor engine
+  react/        # React wrapper
+  angular/      # Angular wrapper + module
+  index.ts      # Angular library entry point
+examples/
+  react/        # runnable React test app
+  angular/      # runnable Angular CLI test app
+demo/
+  index.html    # manual vanilla test page
+test/
+  core.test.ts  # automated core tests
+```
+
+## Author
+
+An Sajin Satheesan <an.sajinsatheesan@gmail.com>
+
+## License
+
+MIT

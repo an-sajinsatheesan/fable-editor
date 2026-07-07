@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FableEditor — npm library demo</title>
+  <link rel="stylesheet" href="../src/core/editor.css">
+  <style>
+    body {
+      margin: 0;
+      background: #f1f3f6;
+      font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+      color: #222f3e;
+    }
+
+    .demo {
+      max-width: 1180px;
+      margin: 26px auto;
+      padding: 0 18px;
+    }
+
+    .demo-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+      font-size: 13.5px;
+      color: #556;
+    }
+
+    .demo-bar button {
+      border: 1px solid #cfd6df;
+      background: #fff;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font: 13px inherit;
+      cursor: pointer;
+    }
+
+    .demo-bar button.on {
+      background: #006ce7;
+      border-color: #006ce7;
+      color: #fff;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="demo">
+    <div class="demo-bar">
+      <span>Language / اللغة:</span>
+      <button id="langEn" class="on">English (LTR)</button>
+      <button id="langAr">العربية (RTL)</button>
+      <span style="margin-inline-start:auto">Paste from Word / Google Docs to test PowerPaste</span>
+    </div>
+    <div id="editor"></div>
+    <div class="demo-bar" style="margin-top:14px">
+      <button id="getContent">Log content to console</button>
+      <button id="setContent">Set sample content</button>
+      <button id="toggleUpload" style="margin-inline-start:auto">Image upload: Base64 (inline)</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { FableEditor } from '../src/core/index.ts';
+
+    /* Sample imageUploadHandler: swap this out for real S3 / Azure Blob / server
+       storage. It should PUT/POST the file to your backend (which then talks to
+       the storage provider with server-side credentials) and resolve with the
+       public URL to insert into the document. This demo just fakes a network
+       round-trip and occasionally rejects, so you can see the uploading/error
+       states on the placeholder. */
+    async function fakeServerUpload(file) {
+      await new Promise((r) => setTimeout(r, 900));
+      if (Math.random() < 0.15) throw new Error('simulated network error');
+      return URL.createObjectURL(file);
+    }
+
+    let useCustomUpload = false;
+    let editor;
+
+    function createEditor(initialContent) {
+      editor = new FableEditor({
+        target: document.getElementById('editor'),
+        language: document.getElementById('langAr').classList.contains('on') ? 'ar' : 'en',
+        height: 400,
+        initialContent,
+        imageUploadHandler: useCustomUpload ? fakeServerUpload : undefined,
+        onImageUploadError: (err) => console.error('image upload failed:', err),
+        onChange: (html) => console.log('changed:', html.length)
+      });
+    }
+
+    createEditor();
+
+    document.getElementById('langEn').addEventListener('click', function () {
+      editor.setLanguage('en');
+      this.classList.add('on');
+      document.getElementById('langAr').classList.remove('on');
+    });
+
+    document.getElementById('langAr').addEventListener('click', function () {
+      editor.setLanguage('ar');
+      this.classList.add('on');
+      document.getElementById('langEn').classList.remove('on');
+    });
+
+    document.getElementById('getContent').addEventListener('click', () => {
+      console.log(editor.getContent());
+    });
+
+    document.getElementById('setContent').addEventListener('click', () => {
+      editor.setContent('<p>This is <strong>sample</strong> content.</p><p><br></p>');
+    });
+
+    document.getElementById('toggleUpload').addEventListener('click', function () {
+      useCustomUpload = !useCustomUpload;
+      this.textContent = useCustomUpload
+        ? 'Image upload: Simulated server upload'
+        : 'Image upload: Base64 (inline)';
+      this.classList.toggle('on', useCustomUpload);
+      const content = editor.getContent();
+      editor.destroy();
+      createEditor(content);
+    });
+  </script>
+</body>
+
+</html>
