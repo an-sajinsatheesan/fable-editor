@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { FableEditorModule } from '@wysiwyg-sa/fable-editor/angular';
+import { FableEditorModule } from 'fable-editor/angular';
 
 @Component({
   selector: 'app-root',
