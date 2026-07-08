@@ -168,7 +168,7 @@ test/
 
 ## Author
 
-An Sajin Satheesan <an.sajinsatheesan@gmail.com>
+Sajin Satheesan <an.sajinsatheesan@gmail.com>
 
 ## License
 

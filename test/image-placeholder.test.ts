@@ -49,7 +49,23 @@ describe('image upload placeholder', () => {
     expect(ph.classList.contains('active')).toBe(true);
     const ctx = document.body.querySelector('.img-ph-ctx') as HTMLElement;
     expect(ctx).toBeInTheDocument();
-    expect(ctx.querySelectorAll('button').length).toBe(2);
+    expect(ctx.querySelectorAll('button').length).toBe(3);
+  });
+
+  it('delete button removes the placeholder', () => {
+    clickImageButton(container);
+    const ctx = document.body.querySelector('.img-ph-ctx') as HTMLElement;
+    (ctx.querySelectorAll('button')[2] as HTMLElement).click();
+    expect(container.querySelector('.earea .img-ph')).toBeNull();
+    expect(document.body.querySelector('.img-ph-ctx')).toBeNull();
+  });
+
+  it('Delete/Backspace key removes a selected placeholder', () => {
+    clickImageButton(container);
+    const ed = container.querySelector('.earea') as HTMLElement;
+    ed.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
+    expect(container.querySelector('.earea .img-ph')).toBeNull();
+    expect(document.body.querySelector('.img-ph-ctx')).toBeNull();
   });
 
   it('link button swaps to a URL input and flags invalid URLs', () => {

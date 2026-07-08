@@ -43,7 +43,7 @@ en:{ dir:'ltr',
   alignnone:'None',
   uploadimg:'Upload from computer',imagelink:'Insert from URL',
   imageurlph:'Paste image URL…',insertimg:'Insert',dropimage:'Drop image here',
-  uploading:'Uploading…',uploadfailed:'Upload failed — click to retry'
+  uploading:'Uploading…',uploadfailed:'Upload failed — click to retry',deleteimg:'Delete image'
 },
 ar:{ dir:'rtl',
   file:'ملف',edit:'تحرير',view:'عرض',insert:'إدراج',format:'التنسيق',
@@ -79,7 +79,7 @@ ar:{ dir:'rtl',
   alignnone:'بدون',
   uploadimg:'رفع من الجهاز',imagelink:'إدراج من رابط',
   imageurlph:'الصق رابط الصورة…',insertimg:'إدراج',dropimage:'أسقط الصورة هنا',
-  uploading:'جارٍ الرفع…',uploadfailed:'فشل الرفع — انقر لإعادة المحاولة'
+  uploading:'جارٍ الرفع…',uploadfailed:'فشل الرفع — انقر لإعادة المحاولة',deleteimg:'حذف الصورة'
 }};
 let lang = 'en';
 const t = k => I18N[lang][k];
@@ -153,7 +153,8 @@ const IC = {
  colbefore:S('<rect x="12" y="4" width="7" height="16" rx="1"/><path d="M2 12h7M6 8.5l-3.5 3.5L6 15.5"/>'),
  colafter:S('<rect x="5" y="4" width="7" height="16" rx="1"/><path d="M15 12h7M18 8.5l3.5 3.5L18 15.5"/>'),
  coldelete:S('<rect x="8.5" y="4" width="7" height="16" rx="1"/><path d="M10.3 8.5l3.4 7M10.3 15.5l3.4-7"/>'),
- tabledelete:S('<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M4 10h16M4 14.5h16M9.5 5v14M14.5 5v14"/><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke-width="2.1"/>')
+ tabledelete:S('<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M4 10h16M4 14.5h16M9.5 5v14M14.5 5v14"/><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke-width="2.1"/>'),
+ trash:S('<path d="M5 7h14M10 7V5h4v2M7.5 7l1 13h7l1-13"/>')
 };
 const TXT = (html)=>`<span class="txt">${html}</span>`;
 
@@ -685,6 +686,13 @@ function clearImgPlaceholderSel(){
   phCtx?.remove(); phCtx=null;
   phActive?.classList.remove('active'); phActive=null;
 }
+function removeImgPlaceholder(){
+  const ph=phActive;
+  if(!ph) return;
+  clearImgPlaceholderSel();
+  ph.remove();
+  refreshState(); onChange();
+}
 function insertImagePlaceholder(){
   restoreSel();
   const id='img-ph-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
@@ -708,7 +716,9 @@ function renderPhCtxButtons(){
   phCtx.innerHTML='';
   phCtx.append(
     ctxBtn(IC.uploadic, t('uploadimg'), ()=>{ phUploadTarget=phActive; pickImage(); }),
-    ctxBtn(IC.linkic, t('imagelink'), renderPhCtxUrlInput)
+    ctxBtn(IC.linkic, t('imagelink'), renderPhCtxUrlInput),
+    ctxSep(),
+    ctxBtn(IC.trash, t('deleteimg'), removeImgPlaceholder)
   );
   positionImgPhCtx();
 }
@@ -793,8 +803,11 @@ function positionImgPhCtx(){
 }
 ed.addEventListener('mousedown', e=>{
   const ph = e.target.closest && e.target.closest('.img-ph');
-  if(ph && ed.contains(ph)){ e.preventDefault(); selectImgPlaceholder(ph); }
+  if(ph && ed.contains(ph)){ e.preventDefault(); ed.focus(); selectImgPlaceholder(ph); }
   else clearImgPlaceholderSel();
+});
+ed.addEventListener('keydown', e=>{
+  if((e.key==='Delete'||e.key==='Backspace') && phActive){ e.preventDefault(); removeImgPlaceholder(); }
 });
 document.addEventListener('mousedown', e=>{
   if(!phActive) return;
@@ -916,7 +929,7 @@ function buildTableCtxToolbar(){
     hl(ctxBtn(IC.colafter, t('colafter'), ()=>tableOp('colafter')),'col'),
     hl(ctxBtn(IC.coldelete, t('delcol'), ()=>tableOp('delcol')),'col'),
     ctxSep(),
-    ctxBtn(IC.tabledelete, t('deltable'), ()=>tableOp('deltable')),
+    ctxBtn(IC.trash, t('deltable'), ()=>tableOp('deltable')),
     ctxBtn(IC.tableic, t('tablepropsttl'), ()=>tablePropsDlg())
   );
   document.body.appendChild(el);
