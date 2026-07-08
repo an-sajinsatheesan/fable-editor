@@ -8,6 +8,21 @@ import { importDocxToHtml } from './docx-import';
 type ImgCorner = 'nw' | 'ne' | 'sw' | 'se';
 const IMG_CORNERS: ImgCorner[] = ['nw', 'ne', 'sw', 'se'];
 
+type TplLayout = 'img-left' | 'img-right' | 'img-top' | 'img-center';
+const TPL_LAYOUTS: TplLayout[] = ['img-left', 'img-right', 'img-top', 'img-center'];
+const TPL_LABEL: Record<TplLayout, keyof I18nStrings> = {
+    'img-left': 'tplimgleft',
+    'img-right': 'tplimgright',
+    'img-top': 'tplimgtop',
+    'img-center': 'tplimgcenter'
+};
+const TPL_ICON: Record<TplLayout, string> = {
+    'img-left': IC.tplleft,
+    'img-right': IC.tplright,
+    'img-top': IC.tpltop,
+    'img-center': IC.tplcenter
+};
+
 export class FableEditor implements FableEditorApi {
     private static instanceCounter = 0;
 
@@ -55,6 +70,9 @@ export class FableEditor implements FableEditorApi {
     private contentStyle?: string;
 
     private selCtx: HTMLElement | null = null;
+
+    private tplActive: HTMLElement | null = null;
+    private tplCtx: HTMLElement | null = null;
 
     private docInput!: HTMLInputElement;
     private revisions: Array<{ time: number; html: string }> = [];
@@ -233,6 +251,7 @@ export class FableEditor implements FableEditorApi {
             this.positionTableHandles();
             this.positionImageHandles();
             this.positionImgPhCtx();
+            this.positionTplCtx();
         });
         this.on(this.ed, 'keydown', (e: KeyboardEvent) => {
             if (e.altKey && e.key === '0') {
@@ -268,6 +287,9 @@ export class FableEditor implements FableEditorApi {
             } else {
                 this.clearImgPlaceholderSel();
             }
+            const tpl = target.closest?.('.tpl') as HTMLElement | null;
+            if (tpl && this.ed.contains(tpl) && !this.options.readonly) this.selectTemplate(tpl);
+            else this.clearTplSel();
             const img = target.closest?.('img') as HTMLImageElement | null;
             if (img && this.ed.contains(img) && !this.options.readonly) {
                 e.preventDefault();
@@ -301,6 +323,7 @@ export class FableEditor implements FableEditorApi {
             this.positionTableHandles();
             this.positionImageHandles();
             this.positionImgPhCtx();
+            this.positionTplCtx();
         });
         this.onWin(
             'scroll',
@@ -308,6 +331,7 @@ export class FableEditor implements FableEditorApi {
                 this.positionTableHandles();
                 this.positionImageHandles();
                 this.positionImgPhCtx();
+                this.positionTplCtx();
                 this.repositionSelToolbar();
             },
             true
@@ -316,6 +340,7 @@ export class FableEditor implements FableEditorApi {
             this.positionTableHandles();
             this.positionImageHandles();
             this.positionImgPhCtx();
+            this.positionTplCtx();
             this.repositionSelToolbar();
         });
 
@@ -356,6 +381,7 @@ export class FableEditor implements FableEditorApi {
                 this.imgHandles.includes(e.target as HTMLElement) ||
                 (this.imgCtx && this.imgCtx.contains(e.target as Node)) ||
                 (this.phCtx && this.phCtx.contains(e.target as Node)) ||
+                (this.tplCtx && this.tplCtx.contains(e.target as Node)) ||
                 (this.selCtx && this.selCtx.contains(e.target as Node)) ||
                 (this.openPop && this.openPop.contains(e.target as Node)) ||
                 (this.openSubEl && this.openSubEl.contains(e.target as Node))
@@ -364,6 +390,7 @@ export class FableEditor implements FableEditorApi {
             this.clearTableHandles();
             this.clearImageHandles();
             this.clearImgPlaceholderSel();
+            this.clearTplSel();
             this.clearSelToolbar();
         });
     }
@@ -402,6 +429,7 @@ export class FableEditor implements FableEditorApi {
         this.clearTableHandles();
         this.clearImageHandles();
         this.clearImgPlaceholderSel();
+        this.clearTplSel();
         this.clearSelToolbar();
         this.onChange();
     }
@@ -463,6 +491,7 @@ export class FableEditor implements FableEditorApi {
         this.clearTableHandles();
         this.clearImageHandles();
         this.clearImgPlaceholderSel();
+        this.clearTplSel();
         this.clearSelToolbar();
         this.listeners.forEach((fn) => fn());
         this.listeners = [];
@@ -1332,6 +1361,7 @@ export class FableEditor implements FableEditorApi {
             rtl: () => this.tbtn(IC.rtl, this.t('rtl'), () => this.setDir('rtl'), 'rtl'),
             quickimage: () => this.tbtn(IC.image, this.t('quickimage'), () => this.insertImagePlaceholder()),
             quicktable: () => tableBtn,
+            template: () => this.menuTbtn(IC.templateic, this.t('template'), (b) => this.templateMenu(b)),
             charmap: () => this.tbtn(IC.charic, this.t('charmap'), () => this.charMap()),
             fullscreen: () => this.tbtn(IC.fullscreen, this.t('fullscreen'), () => this.toggleFullscreen(), 'fullscreen'),
             sourcecode: () => this.tbtn(IC.srcic, this.t('sourcecode'), () => this.sourceDlg())
@@ -1402,6 +1432,7 @@ export class FableEditor implements FableEditorApi {
                 this.mItem('link', IC.link, () => this.linkDlg()),
                 this.mItem('image', IC.image, () => this.insertImagePlaceholder()),
                 { label: this.t('inserttable'), icon: IC.tableic, action: () => this.tableGrid((this.menubar.querySelector('[data-menu-key="table"]') as HTMLElement) || this.menubar) },
+                { label: this.t('template'), icon: IC.templateic, subBuild: (el) => this.buildTemplatePickInto(el) },
                 this.mItem('hr', IC.hric, () => this.exec('insertHorizontalRule')),
                 '|',
                 this.mItem('charmap', IC.charic, () => this.charMap()),
@@ -2041,14 +2072,14 @@ export class FableEditor implements FableEditorApi {
     }
 
     /* ---------------------------------------------- image upload placeholder */
+    private imgPhHTML(id?: string): string {
+        return `<div class="img-ph"${id ? ` id="${id}"` : ''} contenteditable="false">${IC.image}<span>${this.t('dropimage')}</span></div>`;
+    }
+
     private insertImagePlaceholder(): void {
         this.restoreSel();
         const id = 'img-ph-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        document.execCommand(
-            'insertHTML',
-            false,
-            `<div class="img-ph" id="${id}" contenteditable="false">${IC.image}<span>${this.t('dropimage')}</span></div>`
-        );
+        document.execCommand('insertHTML', false, this.imgPhHTML(id));
         const ph = this.ed.querySelector('#' + id) as HTMLElement | null;
         if (ph) {
             ph.removeAttribute('id');
@@ -2068,7 +2099,9 @@ export class FableEditor implements FableEditorApi {
         const ph = this.phActive;
         if (!ph) return;
         this.clearImgPlaceholderSel();
-        ph.remove();
+        /* the placeholder inside a template block IS the media slot — deleting
+           it drops the slot entirely, leaving a text-only block */
+        (ph.closest('.tpl-media') || ph).remove();
         this.refreshState();
         this.onChange();
     }
@@ -2213,6 +2246,139 @@ export class FableEditor implements FableEditorApi {
         if (r.bottom + 8 + ch > innerHeight - 4) cy = Math.max(this.ctxMinTop(), r.top + scrollY - ch - 8);
         this.phCtx.style.left = cx + 'px';
         this.phCtx.style.top = cy + 'px';
+    }
+
+    /* ---------------------------------------------------------- templates */
+    private templateMenu(anchor: HTMLElement): void {
+        this.popup(anchor, (el) => this.buildTemplatePickInto(el));
+    }
+
+    /** Miniature div-based mockup of a layout, mirroring what the block looks
+        like in the editor: grey box = image slot, bars = heading/paragraph. */
+    private tplPreviewHTML(layout: TplLayout): string {
+        const img = '<span class="pv-img"></span>';
+        const head = '<span class="pv-h"></span>';
+        const line = (w: number) => `<span class="pv-l" style="width:${w}%"></span>`;
+        const col = (inner: string) => `<span class="pv-col">${inner}</span>`;
+        const row = (inner: string) => `<span class="pv-row">${inner}</span>`;
+        const textCol = col(head + line(100) + line(88));
+        if (layout === 'img-left')
+            return `<span class="pv">${row(img + textCol)}${line(100)}${line(72)}</span>`;
+        if (layout === 'img-right')
+            return `<span class="pv">${row(textCol + img)}${line(100)}${line(72)}</span>`;
+        if (layout === 'img-top')
+            return `<span class="pv pv-c">${img}${head}${line(100)}${line(72)}</span>`;
+        return `<span class="pv pv-c">${head}${line(100)}${line(72)}${img}</span>`;
+    }
+
+    private buildTemplatePickInto(el: HTMLElement, after?: () => void): void {
+        const wrap = document.createElement('div');
+        wrap.className = 'tplpick';
+        TPL_LAYOUTS.forEach((layout) => {
+            const tile = document.createElement('button');
+            tile.type = 'button';
+            tile.className = 'tpltile';
+            tile.title = this.t(TPL_LABEL[layout]);
+            tile.innerHTML = this.tplPreviewHTML(layout) + `<span class="tpllbl">${this.t(TPL_LABEL[layout])}</span>`;
+            tile.addEventListener('click', () => {
+                this.closePop();
+                this.insertTemplate(layout);
+                after?.();
+            });
+            wrap.appendChild(tile);
+        });
+        el.appendChild(wrap);
+    }
+
+    private insertTemplate(layout: TplLayout): void {
+        this.restoreSel();
+        const media = `<div class="tpl-media" contenteditable="false">${this.imgPhHTML()}</div>`;
+        const text = `<div class="tpl-text"><h2>${this.t('heading')}</h2><p>${this.t('para')}</p></div>`;
+        /* text-above-image layout keeps DOM order = visual order so the caret
+           travels naturally; every other layout has the media slot first */
+        const inner = layout === 'img-center' ? text + media : media + text;
+        document.execCommand('insertHTML', false, `<div class="tpl tpl-${layout}">${inner}</div><p><br></p>`);
+        this.saveSel();
+        this.onChange();
+    }
+
+    private clearTplSel(): void {
+        this.tplCtx?.remove();
+        this.tplCtx = null;
+        this.tplActive?.classList.remove('tpl-selected');
+        this.tplActive = null;
+    }
+
+    private selectTemplate(tpl: HTMLElement): void {
+        if (this.tplActive === tpl) return;
+        this.clearTplSel();
+        this.tplActive = tpl;
+        tpl.classList.add('tpl-selected');
+        this.tplCtx = document.createElement('div');
+        this.tplCtx.className = 'imgctx tplctx';
+        this.tplCtx.dir = this.dir();
+        document.body.appendChild(this.tplCtx);
+        this.renderTplCtxButtons();
+    }
+
+    private renderTplCtxButtons(): void {
+        const el = this.tplCtx;
+        const tpl = this.tplActive;
+        if (!el || !tpl) return;
+        el.innerHTML = '';
+        TPL_LAYOUTS.forEach((layout) => {
+            const b = this.ctxBtn(TPL_ICON[layout], this.t(TPL_LABEL[layout]), () => this.setTplLayout(layout));
+            b.classList.toggle('on', tpl.classList.contains('tpl-' + layout));
+            el.appendChild(b);
+        });
+        el.append(this.ctxSep(), this.ctxBtn(IC.trash, this.t('deltemplate'), () => this.removeTemplate()));
+        this.positionTplCtx();
+    }
+
+    private setTplLayout(layout: TplLayout): void {
+        const tpl = this.tplActive;
+        if (!tpl) return;
+        TPL_LAYOUTS.forEach((l) => tpl.classList.remove('tpl-' + l));
+        tpl.classList.add('tpl-' + layout);
+        /* keep DOM order = visual order (see insertTemplate) */
+        const media = tpl.querySelector(':scope > .tpl-media');
+        const text = tpl.querySelector(':scope > .tpl-text');
+        if (media && text) {
+            if (layout === 'img-center') tpl.appendChild(media);
+            else tpl.insertBefore(media, text);
+        }
+        this.renderTplCtxButtons();
+        this.positionImgPhCtx();
+        this.positionImageHandles();
+        this.onChange();
+    }
+
+    private removeTemplate(): void {
+        const tpl = this.tplActive;
+        if (!tpl) return;
+        this.clearTplSel();
+        if (this.phActive && tpl.contains(this.phActive)) this.clearImgPlaceholderSel();
+        if (this.imgActive && tpl.contains(this.imgActive)) this.clearImageHandles();
+        tpl.remove();
+        this.refreshState();
+        this.onChange();
+    }
+
+    private positionTplCtx(): void {
+        if (this.tplActive && !document.body.contains(this.tplActive)) {
+            this.clearTplSel();
+            return;
+        }
+        if (!this.tplActive || !this.tplCtx) return;
+        const r = this.tplActive.getBoundingClientRect();
+        const cw = this.tplCtx.offsetWidth;
+        const ch = this.tplCtx.offsetHeight;
+        let cx = r.left + scrollX + (r.width - cw) / 2;
+        cx = Math.max(8 + scrollX, Math.min(cx, scrollX + innerWidth - cw - 8));
+        let cy = r.top + scrollY - ch - 8;
+        if (cy < this.ctxMinTop()) cy = r.bottom + scrollY + 8;
+        this.tplCtx.style.left = cx + 'px';
+        this.tplCtx.style.top = cy + 'px';
     }
 
     private pickWordDoc(): void {
@@ -2561,7 +2727,11 @@ export class FableEditor implements FableEditorApi {
             }),
             this.ctxSep(),
             mkBtn(IC.trash, this.t('deleteimg'), false, () => {
-                img.remove();
+                /* inside a template media slot the image swaps back to an
+                   upload placeholder so the slot is not lost */
+                const slot = img.closest('.tpl-media');
+                if (slot && this.ed.contains(slot)) img.outerHTML = this.imgPhHTML();
+                else img.remove();
                 this.clearImageHandles();
                 this.onChange();
             })

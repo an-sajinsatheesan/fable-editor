@@ -110,7 +110,7 @@ describe('FableEditor core', () => {
     it('renders the default toolbar/menubar identically to the built-in layout (golden master)', () => {
       const editor = new FableEditor({ target: container });
       expect(container.querySelectorAll('.tbr .tgrp').length).toBe(16);
-      expect(container.querySelectorAll('.tbr .tgrp > *').length).toBe(41);
+      expect(container.querySelectorAll('.tbr .tgrp > *').length).toBe(42);
       const menuKeys = Array.from(container.querySelectorAll('.mnb button')).map(
         (b) => (b as HTMLElement).dataset.menuKey
       );

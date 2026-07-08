@@ -4,7 +4,7 @@ export const DEFAULT_TOOLBAR =
   'undo redo | preview print | importword revhistory | fontfamily fontsize | fontsizeincrease fontsizedecrease | ' +
   'bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | ' +
   'bullist numlist | outdent indent | link blockquote changecase lineheight wordspacing | removeformat | blocks | ' +
-  'ltr rtl | quickimage quicktable charmap | fullscreen sourcecode';
+  'ltr rtl | quickimage quicktable template charmap | fullscreen sourcecode';
 
 /** Transcribed from the editor's built-in menu keys so that `menubar: true` (the
  *  default) renders identically to the hard-coded original. */

@@ -43,7 +43,9 @@ en:{ dir:'ltr',
   alignnone:'None',
   uploadimg:'Upload from computer',imagelink:'Insert from URL',
   imageurlph:'Paste image URL…',insertimg:'Insert',dropimage:'Drop image here',
-  uploading:'Uploading…',uploadfailed:'Upload failed — click to retry',deleteimg:'Delete image'
+  uploading:'Uploading…',uploadfailed:'Upload failed — click to retry',deleteimg:'Delete image',
+  template:'Templates',tplimgleft:'Image left, text right',tplimgright:'Image right, text left',
+  tplimgtop:'Image top, text below',tplimgcenter:'Text top, image center',deltemplate:'Delete template'
 },
 ar:{ dir:'rtl',
   file:'ملف',edit:'تحرير',view:'عرض',insert:'إدراج',format:'التنسيق',
@@ -79,7 +81,9 @@ ar:{ dir:'rtl',
   alignnone:'بدون',
   uploadimg:'رفع من الجهاز',imagelink:'إدراج من رابط',
   imageurlph:'الصق رابط الصورة…',insertimg:'إدراج',dropimage:'أسقط الصورة هنا',
-  uploading:'جارٍ الرفع…',uploadfailed:'فشل الرفع — انقر لإعادة المحاولة',deleteimg:'حذف الصورة'
+  uploading:'جارٍ الرفع…',uploadfailed:'فشل الرفع — انقر لإعادة المحاولة',deleteimg:'حذف الصورة',
+  template:'قوالب',tplimgleft:'صورة يسار، نص يمين',tplimgright:'صورة يمين، نص يسار',
+  tplimgtop:'صورة أعلى، نص أسفل',tplimgcenter:'نص أعلى، صورة وسط',deltemplate:'حذف القالب'
 }};
 let lang = 'en';
 const t = k => I18N[lang][k];
@@ -154,7 +158,12 @@ const IC = {
  colafter:S('<rect x="5" y="4" width="7" height="16" rx="1"/><path d="M15 12h7M18 8.5l3.5 3.5L18 15.5"/>'),
  coldelete:S('<rect x="8.5" y="4" width="7" height="16" rx="1"/><path d="M10.3 8.5l3.4 7M10.3 15.5l3.4-7"/>'),
  tabledelete:S('<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M4 10h16M4 14.5h16M9.5 5v14M14.5 5v14"/><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke-width="2.1"/>'),
- trash:S('<path d="M5 7h14M10 7V5h4v2M7.5 7l1 13h7l1-13"/>')
+ trash:S('<path d="M5 7h14M10 7V5h4v2M7.5 7l1 13h7l1-13"/>'),
+ templateic:S('<rect x="4" y="4" width="16" height="16" rx="1.5"/><rect x="6.5" y="6.5" width="5" height="5" rx=".5"/><path d="M14 7.5h3.5M14 10h3.5M6.5 14h11M6.5 17h11"/>'),
+ tplleft:S('<rect x="3" y="5" width="8" height="8" rx=".8"/><path d="M13.5 6.5H21M13.5 9.5H21M13.5 12.5H21M3 15.5h18M3 18.5h18"/>'),
+ tplright:S('<rect x="13" y="5" width="8" height="8" rx=".8"/><path d="M3 6.5h7.5M3 9.5h7.5M3 12.5h7.5M3 15.5h18M3 18.5h18"/>'),
+ tpltop:S('<rect x="5" y="3" width="14" height="9" rx=".8"/><path d="M3 15h18M3 18h18M3 21h12"/>'),
+ tplcenter:S('<path d="M3 4h18M3 7h18M3 10h12"/><rect x="5" y="12.5" width="14" height="9" rx=".8"/>')
 };
 const TXT = (html)=>`<span class="txt">${html}</span>`;
 
@@ -425,7 +434,8 @@ function buildToolbar(){
       const btn = ev.currentTarget; saveSel();
       popup(btn, el=>menuItems(el,[
         {label:t('quickimage'),icon:IC.image,action:insertImagePlaceholder},
-        {label:t('quicktable'),icon:IC.tableic,action:()=>tableGrid(btn)}
+        {label:t('quicktable'),icon:IC.tableic,action:()=>tableGrid(btn)},
+        {label:t('template'),icon:IC.templateic,action:()=>templateMenu(btn)}
       ]));
     }) )
   );
@@ -454,6 +464,7 @@ function buildMenubar(){
            mItem('sourcecode',IC.srcic,sourceDlg) ],
     insert:[ mItem('image',IC.image,insertImagePlaceholder),
            {label:t('inserttable'),icon:IC.tableic,action:()=>tableGrid(menubar.children[6]||menubar)},
+           {label:t('template'),icon:IC.templateic,action:()=>templateMenu(menubar.children[3]||menubar)},
            mItem('hr',IC.hric,()=>exec('insertHorizontalRule')), '|',
            mItem('charmap',IC.charic,a=>charMap()),
            mItem('datetime',IC.dateic,()=>exec('insertText',
@@ -686,18 +697,22 @@ function clearImgPlaceholderSel(){
   phCtx?.remove(); phCtx=null;
   phActive?.classList.remove('active'); phActive=null;
 }
+function imgPhHTML(id){
+  return `<div class="img-ph"${id?` id="${id}"`:''} contenteditable="false">${IC.image}<span>${t('dropimage')}</span></div>`;
+}
 function removeImgPlaceholder(){
   const ph=phActive;
   if(!ph) return;
   clearImgPlaceholderSel();
-  ph.remove();
+  /* the placeholder inside a template block IS the media slot — deleting
+     it drops the slot entirely, leaving a text-only block */
+  (ph.closest('.tpl-media') || ph).remove();
   refreshState(); onChange();
 }
 function insertImagePlaceholder(){
   restoreSel();
   const id='img-ph-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-  document.execCommand('insertHTML',false,
-    `<div class="img-ph" id="${id}" contenteditable="false">${IC.image}<span>${t('dropimage')}</span></div>`);
+  document.execCommand('insertHTML',false,imgPhHTML(id));
   const ph=ed.querySelector('#'+id);
   if(ph){ ph.removeAttribute('id'); selectImgPlaceholder(ph); }
   onChange();
@@ -826,6 +841,124 @@ ed.addEventListener('drop', e=>{
   const file=[...(e.dataTransfer?.files||[])].find(f=>f.type.startsWith('image/'));
   if(file) readImageFileInto(file, ph);
 });
+
+/* ---------------------------------------------------------- templates */
+const TPL_LAYOUTS=['img-left','img-right','img-top','img-center'];
+const TPL_LABEL={'img-left':'tplimgleft','img-right':'tplimgright','img-top':'tplimgtop','img-center':'tplimgcenter'};
+const TPL_ICON={'img-left':'tplleft','img-right':'tplright','img-top':'tpltop','img-center':'tplcenter'};
+let tplActive=null, tplCtx=null;
+
+/* miniature div-based mockup of a layout, mirroring what the block looks
+   like in the editor: grey box = image slot, bars = heading/paragraph */
+function tplPreviewHTML(layout){
+  const img='<span class="pv-img"></span>';
+  const head='<span class="pv-h"></span>';
+  const line=w=>`<span class="pv-l" style="width:${w}%"></span>`;
+  const col=inner=>`<span class="pv-col">${inner}</span>`;
+  const row=inner=>`<span class="pv-row">${inner}</span>`;
+  const textCol=col(head+line(100)+line(88));
+  if(layout==='img-left')  return `<span class="pv">${row(img+textCol)}${line(100)}${line(72)}</span>`;
+  if(layout==='img-right') return `<span class="pv">${row(textCol+img)}${line(100)}${line(72)}</span>`;
+  if(layout==='img-top')   return `<span class="pv pv-c">${img}${head}${line(100)}${line(72)}</span>`;
+  return `<span class="pv pv-c">${head}${line(100)}${line(72)}${img}</span>`;
+}
+function buildTemplatePickInto(el){
+  const wrap=document.createElement('div');
+  wrap.className='tplpick';
+  TPL_LAYOUTS.forEach(layout=>{
+    const tile=document.createElement('button');
+    tile.type='button'; tile.className='tpltile'; tile.title=t(TPL_LABEL[layout]);
+    tile.innerHTML=tplPreviewHTML(layout)+`<span class="tpllbl">${t(TPL_LABEL[layout])}</span>`;
+    tile.addEventListener('click',()=>{ closePop(); insertTemplate(layout); });
+    wrap.appendChild(tile);
+  });
+  el.appendChild(wrap);
+}
+function templateMenu(anchor){ popup(anchor, buildTemplatePickInto); }
+function insertTemplate(layout){
+  restoreSel();
+  const media=`<div class="tpl-media" contenteditable="false">${imgPhHTML()}</div>`;
+  const text=`<div class="tpl-text"><h2>${t('heading')}</h2><p>${t('para')}</p></div>`;
+  /* text-above-image layout keeps DOM order = visual order so the caret
+     travels naturally; every other layout has the media slot first */
+  const inner = layout==='img-center' ? text+media : media+text;
+  document.execCommand('insertHTML',false,`<div class="tpl tpl-${layout}">${inner}</div><p><br></p>`);
+  saveSel(); onChange();
+}
+function clearTplSel(){
+  tplCtx?.remove(); tplCtx=null;
+  tplActive?.classList.remove('tpl-selected'); tplActive=null;
+}
+function selectTemplate(tpl){
+  if(tplActive===tpl) return;
+  clearTplSel();
+  tplActive=tpl; tpl.classList.add('tpl-selected');
+  tplCtx=document.createElement('div');
+  tplCtx.className='tblctx tplctx'; tplCtx.dir=t('dir');
+  document.body.appendChild(tplCtx);
+  renderTplCtxButtons();
+}
+function renderTplCtxButtons(){
+  if(!tplCtx || !tplActive) return;
+  tplCtx.innerHTML='';
+  TPL_LAYOUTS.forEach(layout=>{
+    const b=ctxBtn(IC[TPL_ICON[layout]], t(TPL_LABEL[layout]), ()=>setTplLayout(layout));
+    b.classList.toggle('on', tplActive.classList.contains('tpl-'+layout));
+    tplCtx.appendChild(b);
+  });
+  tplCtx.append(ctxSep(), ctxBtn(IC.trash, t('deltemplate'), removeTemplate));
+  positionTplCtx();
+}
+function setTplLayout(layout){
+  const tpl=tplActive;
+  if(!tpl) return;
+  TPL_LAYOUTS.forEach(l=>tpl.classList.remove('tpl-'+l));
+  tpl.classList.add('tpl-'+layout);
+  /* keep DOM order = visual order (see insertTemplate) */
+  const media=tpl.querySelector(':scope > .tpl-media');
+  const text=tpl.querySelector(':scope > .tpl-text');
+  if(media && text){
+    if(layout==='img-center') tpl.appendChild(media);
+    else tpl.insertBefore(media, text);
+  }
+  renderTplCtxButtons();
+  positionImgPhCtx();
+  onChange();
+}
+function removeTemplate(){
+  const tpl=tplActive;
+  if(!tpl) return;
+  clearTplSel();
+  if(phActive && tpl.contains(phActive)) clearImgPlaceholderSel();
+  tpl.remove();
+  refreshState(); onChange();
+}
+function positionTplCtx(){
+  if(tplActive && !document.body.contains(tplActive)){ clearTplSel(); return; }
+  if(!tplActive || !tplCtx) return;
+  const r=tplActive.getBoundingClientRect();
+  const cw=tplCtx.offsetWidth, ch=tplCtx.offsetHeight;
+  let cx=r.left+scrollX+(r.width-cw)/2;
+  cx=Math.max(8+scrollX, Math.min(cx, scrollX+innerWidth-cw-8));
+  let cy=r.top+scrollY-ch-8;
+  if(cy<scrollY+4) cy=r.bottom+scrollY+8;
+  tplCtx.style.left=cx+'px';
+  tplCtx.style.top=cy+'px';
+}
+ed.addEventListener('mousedown', e=>{
+  const tpl = e.target.closest && e.target.closest('.tpl');
+  if(tpl && ed.contains(tpl)) selectTemplate(tpl);
+  else clearTplSel();
+});
+document.addEventListener('mousedown', e=>{
+  if(!tplActive) return;
+  if(ed.contains(e.target) || (tplCtx && tplCtx.contains(e.target))) return;
+  clearTplSel();
+});
+ed.addEventListener('scroll', positionTplCtx);
+window.addEventListener('scroll', positionTplCtx, true);
+window.addEventListener('resize', positionTplCtx);
+ed.addEventListener('input', positionTplCtx);
 
 /* ---------------------------------------------------------- fullscreen / resize */
 function toggleFullscreen(){
