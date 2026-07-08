@@ -1,8 +1,16 @@
 {
   "name": "fable-editor",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "FableEditor — a rich text editor with React and Angular wrappers",
-  "author": "An Sajin Satheesan <an.sajinsatheesan@gmail.com>",
+  "author": "Sajin Satheesan <an.sajinsatheesan@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/an-sajinsatheesan/fable-editor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/an-sajinsatheesan/fable-editor/issues"
+  },
+  "homepage": "https://github.com/an-sajinsatheesan/fable-editor#readme",
   "main": "./dist/core/index.cjs",
   "module": "./dist/core/index.mjs",
   "types": "./dist/core/index.d.ts",

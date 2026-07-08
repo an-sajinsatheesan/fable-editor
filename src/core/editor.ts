@@ -239,6 +239,10 @@ export class FableEditor implements FableEditorApi {
                 e.preventDefault();
                 this.helpDlg();
             }
+            if ((e.key === 'Delete' || e.key === 'Backspace') && this.phActive) {
+                e.preventDefault();
+                this.removeImgPlaceholder();
+            }
         });
         this.on(this.ed, 'paste', (e: ClipboardEvent) => this.handlePaste(e));
         this.on(this.ed, 'drop', (e: DragEvent) => {
@@ -259,6 +263,7 @@ export class FableEditor implements FableEditorApi {
             const ph = target.closest?.('.img-ph') as HTMLElement | null;
             if (ph && this.ed.contains(ph) && !this.options.readonly) {
                 e.preventDefault();
+                this.ed.focus();
                 this.selectImgPlaceholder(ph);
             } else {
                 this.clearImgPlaceholderSel();
@@ -1471,7 +1476,7 @@ export class FableEditor implements FableEditorApi {
                         this.tablePropsDlg();
                     }
                 },
-                { label: this.t('deltable'), icon: IC.tabledelete, action: () => this.tableOp('deltable') }
+                { label: this.t('deltable'), icon: IC.trash, action: () => this.tableOp('deltable') }
             ],
             help: [this.mItem('helpttl', IC.helpic, () => this.helpDlg(), 'Alt+0')]
         };
@@ -2059,6 +2064,15 @@ export class FableEditor implements FableEditorApi {
         this.phActive = null;
     }
 
+    private removeImgPlaceholder(): void {
+        const ph = this.phActive;
+        if (!ph) return;
+        this.clearImgPlaceholderSel();
+        ph.remove();
+        this.refreshState();
+        this.onChange();
+    }
+
     private selectImgPlaceholder(ph: HTMLElement): void {
         if (this.phActive === ph) return;
         this.clearImgPlaceholderSel();
@@ -2080,7 +2094,9 @@ export class FableEditor implements FableEditorApi {
                 this.phUploadTarget = this.phActive;
                 this.pickImage();
             }),
-            this.ctxBtn(IC.link, this.t('imagelink'), () => this.renderPhCtxUrlInput())
+            this.ctxBtn(IC.link, this.t('imagelink'), () => this.renderPhCtxUrlInput()),
+            this.ctxSep(),
+            this.ctxBtn(IC.trash, this.t('deleteimg'), () => this.removeImgPlaceholder())
         );
         this.positionImgPhCtx();
     }
@@ -2321,7 +2337,7 @@ export class FableEditor implements FableEditorApi {
             hl(this.ctxBtn(IC.colafter, this.t('colafter'), () => this.tableOp('colafter')), 'col'),
             hl(this.ctxBtn(IC.coldelete, this.t('delcol'), () => this.tableOp('delcol')), 'col'),
             this.ctxSep(),
-            this.ctxBtn(IC.tabledelete, this.t('deltable'), () => this.tableOp('deltable')),
+            this.ctxBtn(IC.trash, this.t('deltable'), () => this.tableOp('deltable')),
             this.ctxBtn(IC.tableic, this.t('tablepropsttl'), () => this.tablePropsDlg())
         );
         document.body.appendChild(el);
