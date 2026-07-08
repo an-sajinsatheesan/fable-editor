@@ -372,6 +372,148 @@
                stroke: #c92a2a;
           }
 
+          /* template blocks (image + heading/paragraph layouts) */
+          .earea .tpl {
+               margin: 0 0 1em;
+          }
+
+          .earea .tpl::after {
+               content: "";
+               display: block;
+               clear: both;
+          }
+
+          .earea .tpl.tpl-selected {
+               outline: 2px dashed #a8c7f0;
+               outline-offset: 4px;
+          }
+
+          .earea .tpl-media {
+               text-align: center;
+               margin: 0 0 0.5em;
+          }
+
+          .earea .tpl-media img {
+               display: inline-block;
+               max-width: 100%;
+          }
+
+          .earea .tpl .img-ph {
+               display: inline-flex;
+               width: 300px;
+               max-width: 100%;
+               margin: 0;
+               box-sizing: border-box;
+          }
+
+          /* floated media shrink-wraps to the image, so a small image leaves
+             the text beside it and the paragraph overflows below it */
+          .earea .tpl-img-left .tpl-media {
+               float: left;
+               max-width: 50%;
+               margin: 0 1em 0.5em 0;
+          }
+
+          .earea .tpl-img-right .tpl-media {
+               float: right;
+               max-width: 50%;
+               margin: 0 0 0.5em 1em;
+          }
+
+          .earea .tpl-img-left .img-ph,
+          .earea .tpl-img-right .img-ph {
+               width: 260px;
+          }
+
+          .earea .tpl-text > :first-child {
+               margin-top: 0;
+          }
+
+          /* template picker (popup) — miniature previews of each layout */
+          .tplpick {
+               display: grid;
+               grid-template-columns: 1fr 1fr;
+               gap: 8px;
+               padding: 8px;
+          }
+
+          .tpltile {
+               display: flex;
+               flex-direction: column;
+               gap: 6px;
+               width: 132px;
+               padding: 6px;
+               border: 1px solid #cfd6df;
+               border-radius: 8px;
+               background: #fff;
+               cursor: pointer;
+               font: inherit;
+          }
+
+          .tpltile:hover {
+               border-color: #006ce7;
+               background: #f2f7ff;
+          }
+
+          .tpllbl {
+               font-size: 11px;
+               color: #556;
+               text-align: center;
+          }
+
+          .pv {
+               display: flex;
+               flex-direction: column;
+               gap: 4px;
+               height: 78px;
+               padding: 7px;
+               background: #f7f9fb;
+               border-radius: 5px;
+               box-sizing: border-box;
+          }
+
+          .pv-row {
+               display: flex;
+               gap: 5px;
+               flex: 1;
+               min-height: 0;
+          }
+
+          .pv-col {
+               display: flex;
+               flex-direction: column;
+               gap: 4px;
+               flex: 1;
+          }
+
+          .pv-img {
+               background: #c9d4e0;
+               border-radius: 3px;
+               width: 42%;
+               flex: none;
+          }
+
+          .pv-c .pv-img {
+               width: 68%;
+               height: 32px;
+               align-self: center;
+          }
+
+          .pv-h {
+               height: 7px;
+               width: 55%;
+               background: #8fa3b8;
+               border-radius: 2px;
+               flex: none;
+          }
+
+          .pv-l {
+               height: 5px;
+               background: #dbe3ec;
+               border-radius: 2px;
+               flex: none;
+          }
+
           .earea table.tbl-selected {
                outline: 2px solid #006ce7;
                outline-offset: 1px;
@@ -449,6 +591,10 @@
 
           .tblctx button:hover {
                background: #f0f0f0;
+          }
+
+          .tblctx button.on {
+               background: #cce2fa;
           }
 
           .tblctx button svg {

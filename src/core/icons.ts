@@ -191,6 +191,21 @@ export const IC: Record<string, string> = {
   trash: S(
     '<path d="M5 7h14M10 7V5h4v2M7.5 7l1 13h7l1-13"/>'
   ),
+  templateic: S(
+    '<rect x="4" y="4" width="16" height="16" rx="1.5"/><rect x="6.5" y="6.5" width="5" height="5" rx=".5"/><path d="M14 7.5h3.5M14 10h3.5M6.5 14h11M6.5 17h11"/>'
+  ),
+  tplleft: S(
+    '<rect x="3" y="5" width="8" height="8" rx=".8"/><path d="M13.5 6.5H21M13.5 9.5H21M13.5 12.5H21M3 15.5h18M3 18.5h18"/>'
+  ),
+  tplright: S(
+    '<rect x="13" y="5" width="8" height="8" rx=".8"/><path d="M3 6.5h7.5M3 9.5h7.5M3 12.5h7.5M3 15.5h18M3 18.5h18"/>'
+  ),
+  tpltop: S(
+    '<rect x="5" y="3" width="14" height="9" rx=".8"/><path d="M3 15h18M3 18h18M3 21h12"/>'
+  ),
+  tplcenter: S(
+    '<path d="M3 4h18M3 7h18M3 10h12"/><rect x="5" y="12.5" width="14" height="9" rx=".8"/>'
+  ),
   rotateleft: S(
     '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>'
   ),

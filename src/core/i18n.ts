@@ -135,6 +135,12 @@ export interface I18nStrings {
   dropimage: string;
   uploading: string;
   uploadfailed: string;
+  template: string;
+  tplimgleft: string;
+  tplimgright: string;
+  tplimgtop: string;
+  tplimgcenter: string;
+  deltemplate: string;
 }
 
 export const I18N: Record<EditorLanguage, I18nStrings> = {
@@ -272,7 +278,13 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     insertimg: 'Insert',
     dropimage: 'Drop image here',
     uploading: 'Uploading…',
-    uploadfailed: 'Upload failed — click to retry'
+    uploadfailed: 'Upload failed — click to retry',
+    template: 'Templates',
+    tplimgleft: 'Image left, text right',
+    tplimgright: 'Image right, text left',
+    tplimgtop: 'Image top, text below',
+    tplimgcenter: 'Text top, image center',
+    deltemplate: 'Delete template'
   },
   ar: {
     dir: 'rtl',
@@ -408,7 +420,13 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     insertimg: 'إدراج',
     dropimage: 'أسقط الصورة هنا',
     uploading: 'جارٍ الرفع…',
-    uploadfailed: 'فشل الرفع — انقر لإعادة المحاولة'
+    uploadfailed: 'فشل الرفع — انقر لإعادة المحاولة',
+    template: 'قوالب',
+    tplimgleft: 'صورة يسار، نص يمين',
+    tplimgright: 'صورة يمين، نص يسار',
+    tplimgtop: 'صورة أعلى، نص أسفل',
+    tplimgcenter: 'نص أعلى، صورة وسط',
+    deltemplate: 'حذف القالب'
   }
 };
 
