@@ -27,6 +27,9 @@ export class FableEditorComponent implements OnInit, OnChanges, OnDestroy {
   @Input() toolbar: boolean | string = true;
   @Input() statusbar = true;
   @Input() readonly = false;
+  @Input() primaryColor?: string;
+  @Input() toolbarGroupBackground?: string;
+  @Input() uiFontFamily?: string;
   @Input() init: Partial<Omit<EditorInitOptions, 'target'>> = {};
   @Input() value = '';
 
@@ -46,6 +49,9 @@ export class FableEditorComponent implements OnInit, OnChanges, OnDestroy {
       toolbar: this.toolbar,
       statusbar: this.statusbar,
       readonly: this.readonly,
+      primaryColor: this.primaryColor,
+      toolbarGroupBackground: this.toolbarGroupBackground,
+      uiFontFamily: this.uiFontFamily,
       initialContent: this.value,
       ...this.init,
       onChange: (content) => {

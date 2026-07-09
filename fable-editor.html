@@ -10,7 +10,7 @@
           body {
                margin: 0;
                background: #f1f3f6;
-               font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+               font-family: var(--fable-ui-font, 'Noto Sans', 'Segoe UI', system-ui, Arial, sans-serif);
                color: #222f3e;
           }
 
@@ -39,8 +39,8 @@
           }
 
           .demo-bar button.on {
-               background: #006ce7;
-               border-color: #006ce7;
+               background: var(--fable-primary, #df3c2b);
+               border-color: var(--fable-primary, #df3c2b);
                color: #fff
           }
 
@@ -52,7 +52,7 @@
                box-shadow: 0 1px 2px rgba(34, 47, 62, .06);
                display: flex;
                flex-direction: column;
-               font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+               font-family: var(--fable-ui-font, 'Noto Sans', 'Segoe UI', system-ui, Arial, sans-serif);
                position: relative;
           }
 
@@ -100,6 +100,8 @@
                align-items: center;
                padding: 0 6px;
                position: relative;
+               background: var(--fable-tgrp-bg, transparent);
+               border-radius: 20px;
           }
 
           .tgrp+.tgrp::before {
@@ -134,7 +136,7 @@
           }
 
           .tbtn.on {
-               background: #cce2fa;
+               background: color-mix(in srgb, var(--fable-primary, #df3c2b) 18%, #fff);
           }
 
           .tbtn:disabled {
@@ -321,7 +323,7 @@
                max-width: 360px;
                padding: 18px 14px;
                margin: 8px 0;
-               border: 1.5px solid #a8c7f0;
+               border: 1.5px solid color-mix(in srgb, var(--fable-primary, #df3c2b) 45%, #fff);
                border-radius: 8px;
                background: #fbfdff;
                color: #7a828e;
@@ -344,7 +346,7 @@
           }
 
           .earea .img-ph.active, .earea .vid-ph.active {
-               outline: 2px solid #006ce7;
+               outline: 2px solid var(--fable-primary, #df3c2b);
                outline-offset: 1px;
           }
 
@@ -372,24 +374,6 @@
                stroke: #c92a2a;
           }
 
-          /* math / LaTeX formulas */
-          .earea .math-fable {
-               cursor: pointer;
-               border-radius: 4px;
-          }
-
-          .earea .math-fable-block {
-               display: block;
-               text-align: center;
-               margin: 0.5em 0;
-               padding: 4px;
-          }
-
-          .earea .math-fable.math-selected {
-               outline: 2px solid #006ce7;
-               outline-offset: 2px;
-          }
-
           /* embedded hosted players (YouTube & co.) */
           .earea .video-embed {
                display: inline-block;
@@ -404,8 +388,8 @@
                max-width: 100%;
           }
 
-          .earea .video-embed.math-selected {
-               outline: 2px solid #006ce7;
+          .earea .video-embed.embed-selected {
+               outline: 2px solid var(--fable-primary, #df3c2b);
                outline-offset: 2px;
           }
 
@@ -421,7 +405,7 @@
           }
 
           .earea .tpl.tpl-selected {
-               outline: 2px dashed #a8c7f0;
+               outline: 2px dashed color-mix(in srgb, var(--fable-primary, #df3c2b) 45%, #fff);
                outline-offset: 4px;
           }
 
@@ -496,8 +480,8 @@
           }
 
           .tpltile:hover {
-               border-color: #006ce7;
-               background: #f2f7ff;
+               border-color: var(--fable-primary, #df3c2b);
+               background: color-mix(in srgb, var(--fable-primary, #df3c2b) 6%, #fff);
           }
 
           .tpllbl {
@@ -560,7 +544,7 @@
           }
 
           .earea table.tbl-selected {
-               outline: 2px solid #006ce7;
+               outline: 2px solid var(--fable-primary, #df3c2b);
                outline-offset: 1px;
           }
 
@@ -568,7 +552,7 @@
                position: absolute;
                width: 10px;
                height: 10px;
-               background: #006ce7;
+               background: var(--fable-primary, #df3c2b);
                border: 1px solid #fff;
                border-radius: 2px;
                box-shadow: 0 0 0 1px rgba(34, 47, 62, .25);
@@ -593,7 +577,7 @@
           .tbl-cellmark {
                position: absolute;
                pointer-events: none;
-               border: 1.5px solid #006ce7;
+               border: 1.5px solid var(--fable-primary, #df3c2b);
                border-radius: 1px;
                z-index: 1145;
           }
@@ -602,7 +586,7 @@
           .tbl-opmark {
                position: absolute;
                pointer-events: none;
-               border: 1.5px dashed #006ce7;
+               border: 1.5px dashed var(--fable-primary, #df3c2b);
                background: rgba(0, 108, 231, .07);
                border-radius: 2px;
                z-index: 1144;
@@ -639,7 +623,7 @@
           }
 
           .tblctx button.on {
-               background: #cce2fa;
+               background: color-mix(in srgb, var(--fable-primary, #df3c2b) 18%, #fff);
           }
 
           .tblctx button svg {
@@ -767,7 +751,7 @@
           }
 
           .pop .mi.on {
-               background: #cce2fa;
+               background: color-mix(in srgb, var(--fable-primary, #df3c2b) 18%, #fff);
           }
 
           .pop .mi .ic {
@@ -860,8 +844,8 @@
           }
 
           .chmap .chtabs button.on {
-               background: #e8f1fb;
-               color: #0060ce;
+               background: color-mix(in srgb, var(--fable-primary, #df3c2b) 12%, #fff);
+               color: var(--fable-primary, #df3c2b);
                font-weight: 600;
           }
 
@@ -928,8 +912,8 @@
           }
 
           .tgrid span.hot {
-               background: #cce2fa;
-               border-color: #7fb3ef;
+               background: color-mix(in srgb, var(--fable-primary, #df3c2b) 18%, #fff);
+               border-color: color-mix(in srgb, var(--fable-primary, #df3c2b) 55%, #fff);
           }
 
           .tgridlbl {
@@ -1010,8 +994,8 @@
           }
 
           .dlg footer button.pri {
-               background: #006ce7;
-               border-color: #006ce7;
+               background: var(--fable-primary, #df3c2b);
+               border-color: var(--fable-primary, #df3c2b);
                color: #fff;
           }
 
@@ -1046,8 +1030,8 @@
           }
 
           .dlg .dtabs button.on {
-               color: #006ce7;
-               border-bottom-color: #006ce7;
+               color: var(--fable-primary, #df3c2b);
+               border-bottom-color: var(--fable-primary, #df3c2b);
                font-weight: 600;
           }
 
@@ -1127,10 +1111,6 @@
                border: 1px solid #dde2e8;
           }
      </style>
-     <!-- Math formulas are rendered with KaTeX (https://katex.org). Required for the
-          "Insert math formula" toolbar/menu item — remove along with that feature if unused. -->
-     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 </head>
 
 <body>

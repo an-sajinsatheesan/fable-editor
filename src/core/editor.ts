@@ -1,10 +1,9 @@
 import { EditorInitOptions, EditorLanguage, FableEditorApi, MenuItemDef, DialogButton } from './types';
 import { getStrings, I18nStrings } from './i18n';
-import { FONTS, SIZES, BLOCKS, COLORS, QUICK_COLORS, CHAR_CATEGORIES, EMOJI_CATEGORIES, GlyphCategory, MIN_FONT_PX, MAX_FONT_PX, LINE_HEIGHTS, WORD_SPACINGS, DEFAULT_TOOLBAR, DEFAULT_MENUBAR } from './config';
+import { FONTS, SIZES, BLOCKS, COLORS, QUICK_COLORS, CHAR_CATEGORIES, EMOJI_CATEGORIES, GlyphCategory, MIN_FONT_PX, MAX_FONT_PX, LINE_HEIGHTS, WORD_SPACINGS, LETTER_SPACINGS, DEFAULT_TOOLBAR, DEFAULT_MENUBAR } from './config';
 import { IC } from './icons';
 import { cleanPastedHTML, normalizeTextPaste } from './paste-engine';
 import { importDocxToHtml } from './docx-import';
-import katex from 'katex';
 
 type ImgCorner = 'nw' | 'ne' | 'sw' | 'se';
 const IMG_CORNERS: ImgCorner[] = ['nw', 'ne', 'sw', 'se'];
@@ -30,7 +29,14 @@ export class FableEditor implements FableEditorApi {
     private options: Required<
         Omit<
             EditorInitOptions,
-            'imageUploadHandler' | 'onImageUploadError' | 'contentStyle' | 'videoUploadHandler' | 'onVideoUploadError'
+            | 'imageUploadHandler'
+            | 'onImageUploadError'
+            | 'contentStyle'
+            | 'videoUploadHandler'
+            | 'onVideoUploadError'
+            | 'primaryColor'
+            | 'toolbarGroupBackground'
+            | 'uiFontFamily'
         >
     >;
     private lang: EditorLanguage = 'en';
@@ -87,9 +93,6 @@ export class FableEditor implements FableEditorApi {
     private videoUploadHandler?: (file: File) => Promise<string>;
     private onVideoUploadError?: (error: unknown, file: File) => void;
 
-    private mathActive: HTMLElement | null = null;
-    private mathCtx: HTMLElement | null = null;
-
     private selCtx: HTMLElement | null = null;
 
     private tplActive: HTMLElement | null = null;
@@ -126,6 +129,7 @@ export class FableEditor implements FableEditorApi {
         this.videoUploadHandler = options.videoUploadHandler;
         this.onVideoUploadError = options.onVideoUploadError;
         this.contentStyle = options.contentStyle;
+        this.applyTheme(options);
         this.lang = this.options.language;
         this.draftStorageKey = 'tmclone-draft:' + this.options.draftKey;
         this.initDOM();
@@ -216,6 +220,16 @@ export class FableEditor implements FableEditorApi {
         target.appendChild(this.docInput);
     }
 
+    /** Theme options land as CSS variables on the document root rather than the editor
+     *  shell, because dialogs, popups and floating context toolbars are appended to
+     *  document.body and would not inherit variables scoped to the shell. */
+    private applyTheme(options: EditorInitOptions): void {
+        const root = document.documentElement;
+        if (options.primaryColor) root.style.setProperty('--fable-primary', options.primaryColor);
+        if (options.toolbarGroupBackground) root.style.setProperty('--fable-tgrp-bg', options.toolbarGroupBackground);
+        if (options.uiFontFamily) root.style.setProperty('--fable-ui-font', options.uiFontFamily);
+    }
+
     /** Rewrites the literal word `body` in a user-supplied `contentStyle` string to a
      *  selector scoped to this instance's content div. Everything else passes through
      *  verbatim, since `.ed` is a plain div in the host page (not an iframe) and an
@@ -284,7 +298,6 @@ export class FableEditor implements FableEditorApi {
             this.positionTplCtx();
             this.positionVphCtx();
             this.positionVidCtx();
-            this.positionMathCtx();
         });
         this.on(this.ed, 'keydown', (e: KeyboardEvent) => {
             if (e.altKey && e.key === '0') {
@@ -299,7 +312,6 @@ export class FableEditor implements FableEditorApi {
                 e.preventDefault();
                 this.removeVphPlaceholder();
             }
-            if (e.key === '$' && !e.ctrlKey && !e.metaKey && !e.altKey) this.tryMathTyping(e);
         });
         this.on(this.ed, 'paste', (e: ClipboardEvent) => this.handlePaste(e));
         this.on(this.ed, 'drop', (e: DragEvent) => {
@@ -358,13 +370,6 @@ export class FableEditor implements FableEditorApi {
             } else {
                 this.clearVidHandles();
             }
-            const mathEl = target.closest?.('.math-fable') as HTMLElement | null;
-            if (mathEl && this.ed.contains(mathEl) && !this.options.readonly) {
-                e.preventDefault();
-                this.selectMathEl(mathEl);
-            } else {
-                this.clearMathSel();
-            }
         });
         this.on(this.ed, 'mouseover', (e: MouseEvent) => {
             if (this.options.readonly) return;
@@ -394,7 +399,6 @@ export class FableEditor implements FableEditorApi {
             this.positionTplCtx();
             this.positionVphCtx();
             this.positionVidCtx();
-            this.positionMathCtx();
         });
         this.onWin(
             'scroll',
@@ -405,7 +409,6 @@ export class FableEditor implements FableEditorApi {
                 this.positionTplCtx();
                 this.positionVphCtx();
                 this.positionVidCtx();
-                this.positionMathCtx();
                 this.repositionSelToolbar();
             },
             true
@@ -417,7 +420,6 @@ export class FableEditor implements FableEditorApi {
             this.positionTplCtx();
             this.positionVphCtx();
             this.positionVidCtx();
-            this.positionMathCtx();
             this.repositionSelToolbar();
         });
 
@@ -484,7 +486,6 @@ export class FableEditor implements FableEditorApi {
                 (this.selCtx && this.selCtx.contains(e.target as Node)) ||
                 (this.vphCtx && this.vphCtx.contains(e.target as Node)) ||
                 (this.vidCtx && this.vidCtx.contains(e.target as Node)) ||
-                (this.mathCtx && this.mathCtx.contains(e.target as Node)) ||
                 (this.openPop && this.openPop.contains(e.target as Node)) ||
                 (this.openSubEl && this.openSubEl.contains(e.target as Node))
             )
@@ -495,7 +496,6 @@ export class FableEditor implements FableEditorApi {
             this.clearTplSel();
             this.clearVphPlaceholderSel();
             this.clearVidHandles();
-            this.clearMathSel();
             this.clearSelToolbar();
         });
     }
@@ -537,7 +537,6 @@ export class FableEditor implements FableEditorApi {
         this.clearTplSel();
         this.clearVphPlaceholderSel();
         this.clearVidHandles();
-        this.clearMathSel();
         this.clearSelToolbar();
         this.onChange();
     }
@@ -602,7 +601,6 @@ export class FableEditor implements FableEditorApi {
         this.clearTplSel();
         this.clearVphPlaceholderSel();
         this.clearVidHandles();
-        this.clearMathSel();
         this.clearSelToolbar();
         this.listeners.forEach((fn) => fn());
         this.listeners = [];
@@ -1203,18 +1201,19 @@ export class FableEditor implements FableEditorApi {
         });
     }
 
-    private applyBlockStyle(prop: 'lineHeight' | 'wordSpacing', value: string): void {
+    private applyBlockStyle(prop: 'lineHeight' | 'wordSpacing' | 'letterSpacing', value: string): void {
         this.restoreSel();
         const blocks = this.selectedBlocks();
+        const cssProp = prop === 'lineHeight' ? 'line-height' : prop === 'wordSpacing' ? 'word-spacing' : 'letter-spacing';
         blocks.forEach((b) => {
             if (value) b.style[prop] = value;
-            else b.style.removeProperty(prop === 'lineHeight' ? 'line-height' : 'word-spacing');
+            else b.style.removeProperty(cssProp);
         });
         this.saveSel();
         this.onChange();
     }
 
-    private currentBlockStyle(prop: 'lineHeight' | 'wordSpacing'): string {
+    private currentBlockStyle(prop: 'lineHeight' | 'wordSpacing' | 'letterSpacing'): string {
         const s = window.getSelection();
         const b = s ? this.closestBlock(s.anchorNode) : null;
         return b ? b.style[prop] || '' : '';
@@ -1243,6 +1242,20 @@ export class FableEditor implements FableEditorApi {
                     label: v,
                     on: cur === v,
                     action: () => this.applyBlockStyle('wordSpacing', v)
+                }))
+            ]);
+        });
+    }
+
+    private letterSpacingMenu(anchor: HTMLButtonElement): void {
+        const cur = this.currentBlockStyle('letterSpacing');
+        this.popup(anchor, (el) => {
+            this.menuItems(el, [
+                { label: this.t('normal'), on: !cur, action: () => this.applyBlockStyle('letterSpacing', '') },
+                ...LETTER_SPACINGS.map((v) => ({
+                    label: v,
+                    on: cur === v,
+                    action: () => this.applyBlockStyle('letterSpacing', v)
                 }))
             ]);
         });
@@ -1467,13 +1480,13 @@ export class FableEditor implements FableEditorApi {
             changecase: () => this.menuTbtn(IC.caseic, this.t('changecase'), (b) => this.caseMenu(b)),
             lineheight: () => this.menuTbtn(IC.lineheight, this.t('lineheight'), (b) => this.lineHeightMenu(b)),
             wordspacing: () => this.menuTbtn(IC.wordspacing, this.t('wordspacing'), (b) => this.wordSpacingMenu(b)),
+            letterspacing: () => this.menuTbtn(IC.letterspacing, this.t('letterspacing'), (b) => this.letterSpacingMenu(b)),
             removeformat: () => this.tbtn(IC.clearformatic, this.t('removeformat'), () => this.exec('removeFormat')),
             blocks: () => this.tsel('w-block', 'blocksel', this.t('para'), (b) => this.blocksMenu(b)),
             ltr: () => this.tbtn(IC.ltr, this.t('ltr'), () => this.setDir('ltr'), 'ltr'),
             rtl: () => this.tbtn(IC.rtl, this.t('rtl'), () => this.setDir('rtl'), 'rtl'),
             quickimage: () => this.tbtn(IC.image, this.t('quickimage'), () => this.insertImagePlaceholder()),
             quickvideo: () => this.tbtn(IC.video, this.t('quickvideo'), () => this.videoDlg()),
-            mathformula: () => this.tbtn(IC.mathic, this.t('mathformula'), () => this.mathDlg()),
             quicktable: () => tableBtn,
             template: () => this.menuTbtn(IC.templateic, this.t('template'), (b) => this.templateMenu(b)),
             charmap: () => this.tbtn(IC.charic, this.t('charmap'), () => this.charMap()),
@@ -1554,7 +1567,6 @@ export class FableEditor implements FableEditorApi {
                 this.mItem('link', IC.link, () => this.linkDlg()),
                 this.mItem('image', IC.image, () => this.insertImagePlaceholder()),
                 this.mItem('video', IC.video, () => this.videoDlg()),
-                this.mItem('mathformula', IC.mathic, () => this.mathDlg()),
                 { label: this.t('inserttable'), icon: IC.tableic, action: () => this.tableGrid((this.menubar.querySelector('[data-menu-key="table"]') as HTMLElement) || this.menubar) },
                 { label: this.t('template'), icon: IC.templateic, subBuild: (el) => this.buildTemplatePickInto(el) },
                 this.mItem('hr', IC.hric, () => this.exec('insertHorizontalRule')),
@@ -2911,221 +2923,8 @@ export class FableEditor implements FableEditorApi {
         );
     }
 
-    /* ---------------------------------------------------------- math / LaTeX formulas */
-    private renderMathHTML(latex: string, block: boolean): string {
-        try {
-            return katex.renderToString(latex, { throwOnError: false, displayMode: block, strict: 'ignore' });
-        } catch {
-            return '';
-        }
-    }
-
-    /** Shared by the math dialog, math paste, and math typing: renders `src` with
-     *  KaTeX and inserts it at the caret as the standard math element (inline span /
-     *  block div carrying its LaTeX source in data-latex). Block formulas get the
-     *  same \begin{aligned} wrapping the dialog applies, so pasted derivations align
-     *  their steps and re-open correctly in the edit dialog. */
-    private insertMathElement(src: string, block: boolean): void {
-        const latex = block ? `\\begin{aligned}${src}\\end{aligned}` : src;
-        const rendered = this.renderMathHTML(latex, block);
-        const tag = block ? 'div' : 'span';
-        document.execCommand(
-            'insertHTML',
-            false,
-            `<${tag} class="math-fable${block ? ' math-fable-block' : ''}" contenteditable="false" data-latex="${this.escapeAttr(src)}">${rendered}</${tag}>`
-        );
-    }
-
-    /** Recognizes a plain-text clipboard payload that is entirely one math formula:
-     *  $$…$$ / \[…\] (block), \(…\) (inline), a \begin{…}…\end{…} environment (block),
-     *  or $…$ (inline — only when the inside looks like LaTeX, so "$50" stays text).
-     *  Multi-line block content (a derivation pasted as separate lines) gets its lines
-     *  joined with \\ so each step lands on its own line. Returns null for anything
-     *  else, letting the normal paste pipeline run unchanged. */
-    private mathFromClipboard(text: string): { latex: string; block: boolean } | null {
-        const t = text.trim();
-        if (!t) return null;
-        const block = t.match(/^\$\$([\s\S]+)\$\$$/) || t.match(/^\\\[([\s\S]+)\\\]$/);
-        if (block) {
-            const src = block[1].trim();
-            if (!src || src.includes('$')) return null;
-            return { latex: this.joinDerivationLines(src), block: true };
-        }
-        if (/^\\begin\{[a-zA-Z*]+\}[\s\S]+\\end\{[a-zA-Z*]+\}$/.test(t)) {
-            return { latex: this.joinDerivationLines(t), block: true };
-        }
-        const inline = t.match(/^\\\(([\s\S]+)\\\)$/) || t.match(/^\$([^$\n]+)\$$/);
-        if (inline) {
-            const src = inline[1].trim();
-            if (!src || src.includes('$')) return null;
-            if (t.startsWith('$') && !/[\\^_{}=]/.test(src)) return null;
-            return { latex: src, block: false };
-        }
-        return null;
-    }
-
-    /** A derivation pasted as separate lines has no explicit \\ row breaks — add them.
-     *  Content that already breaks rows itself (\\ present, or a \begin environment
-     *  managing its own layout) only has its newlines collapsed to spaces. */
-    private joinDerivationLines(src: string): string {
-        if (!/\n/.test(src)) return src;
-        if (/\\\\/.test(src) || /\\begin\{/.test(src)) return src.replace(/\s*\n\s*/g, ' ');
-        return src
-            .split(/\n+/)
-            .map((l) => l.trim())
-            .filter(Boolean)
-            .join(' \\\\ ');
-    }
-
-    /** Typing "$…$" converts to an inline formula the moment the closing "$" is typed,
-     *  so math can be written in place without opening the dialog. Only kicks in when
-     *  the run since the opening "$" parses as valid LaTeX and contains LaTeX-ish
-     *  syntax (\ ^ _ { } =) — a literal "$5 and 3$" stays plain text. */
-    private tryMathTyping(e: KeyboardEvent): void {
-        const sel = window.getSelection();
-        if (!sel || !sel.isCollapsed || !sel.anchorNode) return;
-        const node = sel.anchorNode;
-        if (node.nodeType !== Node.TEXT_NODE || !this.ed.contains(node)) return;
-        if (node.parentElement?.closest('.math-fable, pre, code')) return;
-        const before = (node.textContent || '').slice(0, sel.anchorOffset);
-        const m = before.match(/(?:^|[^\\$])\$([^$]+)$/);
-        if (!m) return;
-        const src = m[1];
-        if (/^\s|\s$/.test(src) || !/[\\^_{}=]/.test(src)) return;
-        const rendered = this.renderMathHTML(src, false);
-        if (!rendered || rendered.includes('katex-error')) return;
-        e.preventDefault();
-        const range = document.createRange();
-        range.setStart(node, sel.anchorOffset - src.length - 1);
-        range.setEnd(node, sel.anchorOffset);
-        sel.removeAllRanges();
-        sel.addRange(range);
-        this.insertMathElement(src, false);
-        this.onChange();
-    }
-
-    private mathDlg(existing?: HTMLElement): void {
-        this.saveSel();
-        const isBlock = existing?.classList.contains('math-fable-block') ?? false;
-        const initialLatex = existing?.dataset.latex ? this.unescapeAttr(existing.dataset.latex) : '';
-        let ta: HTMLTextAreaElement;
-        let derivChk: HTMLInputElement;
-        let preview: HTMLElement;
-        const updatePreview = () => {
-            const src = ta.value || '';
-            const block = derivChk.checked;
-            const latex = block ? `\\begin{aligned}${src}\\end{aligned}` : src;
-            preview.innerHTML = this.renderMathHTML(latex, block);
-        };
-        this.dialog(
-            this.t('mathdlgttl'),
-            (body) => {
-                ta = document.createElement('textarea');
-                ta.value = initialLatex;
-                ta.placeholder = 'e.g. x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}';
-                ta.style.cssText = 'width:360px;max-width:100%;min-height:80px;font-family:monospace;font-size:13px';
-                const chkRow = document.createElement('label');
-                chkRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin:8px 0;font-size:13.5px;color:#445';
-                derivChk = document.createElement('input');
-                derivChk.type = 'checkbox';
-                derivChk.checked = isBlock;
-                chkRow.append(derivChk, document.createTextNode(this.t('mathderivation')));
-                preview = document.createElement('div');
-                preview.className = 'math-preview';
-                preview.style.cssText = 'min-height:40px;margin-top:8px;padding:10px;border:1px solid #e1e5ea;border-radius:6px;overflow:auto';
-                ta.addEventListener('input', updatePreview);
-                derivChk.addEventListener('change', updatePreview);
-                body.append(ta, chkRow, preview);
-                setTimeout(() => {
-                    ta.focus();
-                    updatePreview();
-                }, 0);
-            },
-            [
-                { label: this.t('cancel'), action: () => this.closeDlg() },
-                {
-                    label: this.t('save'),
-                    primary: true,
-                    action: () => {
-                        const src = ta.value.trim();
-                        this.closeDlg();
-                        if (!src) return;
-                        const block = derivChk.checked;
-                        if (existing) {
-                            const latex = block ? `\\begin{aligned}${src}\\end{aligned}` : src;
-                            existing.className = block ? 'math-fable math-fable-block' : 'math-fable';
-                            existing.dataset.latex = this.escapeAttr(src);
-                            existing.innerHTML = this.renderMathHTML(latex, block);
-                            this.clearMathSel();
-                            this.onChange();
-                            return;
-                        }
-                        this.restoreSel();
-                        this.insertMathElement(src, block);
-                        this.onChange();
-                    }
-                }
-            ]
-        );
-    }
-
     private escapeAttr(s: string): string {
         return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-    }
-
-    private unescapeAttr(s: string): string {
-        return s.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
-    }
-
-    private clearMathSel(): void {
-        this.mathCtx?.remove();
-        this.mathCtx = null;
-        this.mathActive?.classList.remove('math-selected');
-        this.mathActive = null;
-    }
-
-    private selectMathEl(el: HTMLElement): void {
-        if (this.mathActive === el) return;
-        this.clearMathSel();
-        this.mathActive = el;
-        el.classList.add('math-selected');
-        this.mathCtx = this.buildMathCtxToolbar(el);
-        this.positionMathCtx();
-    }
-
-    private buildMathCtxToolbar(el: HTMLElement): HTMLElement {
-        const ctx = document.createElement('div');
-        ctx.className = 'imgctx';
-        ctx.dir = this.dir();
-        ctx.append(
-            this.ctxBtn(IC.editic, this.t('editmath'), () => this.mathDlg(el)),
-            this.ctxSep(),
-            this.ctxBtn(IC.trash, this.t('deletemath'), () => {
-                el.remove();
-                this.clearMathSel();
-                this.onChange();
-            })
-        );
-        ctx.addEventListener('mousedown', (e) => e.preventDefault());
-        document.body.appendChild(ctx);
-        return ctx;
-    }
-
-    private positionMathCtx(): void {
-        if (!this.mathActive || !document.body.contains(this.mathActive)) {
-            this.clearMathSel();
-            return;
-        }
-        const r = this.mathActive.getBoundingClientRect();
-        if (!this.mathCtx) return;
-        const cw = this.mathCtx.offsetWidth;
-        const ch = this.mathCtx.offsetHeight;
-        let cx = r.left + scrollX + (r.width - cw) / 2;
-        cx = Math.max(8 + scrollX, Math.min(cx, scrollX + innerWidth - cw - 8));
-        let cy = r.top + scrollY - ch - 8;
-        if (cy < this.ctxMinTop()) cy = r.bottom + scrollY + 8;
-        this.mathCtx.style.left = cx + 'px';
-        this.mathCtx.style.top = cy + 'px';
     }
 
     /* ---------------------------------------------------------- templates */
@@ -3905,18 +3704,10 @@ export class FableEditor implements FableEditorApi {
             return;
         }
         if (!html) {
-            /* plain-text pastes get two additive pre-checks before the normal text
-               pipeline runs (the paste engine itself is untouched): a clipboard that
-               is entirely one LaTeX formula/derivation becomes a rendered math
-               element, and a bare video page URL (YouTube & co.) becomes an
-               embedded player. Anything else falls through unchanged. */
+            /* additive pre-check before the normal text pipeline runs (the paste
+               engine itself is untouched): a bare video page URL (YouTube & co.)
+               becomes an embedded player. Anything else falls through unchanged. */
             const text = cd.getData('text/plain');
-            const math = this.mathFromClipboard(text);
-            if (math) {
-                this.insertMathElement(math.latex, math.block);
-                this.onChange();
-                return;
-            }
             const embed = /^\S+$/.test(text.trim()) ? this.videoEmbedUrl(text.trim()) : null;
             if (embed) {
                 document.execCommand('insertHTML', false, this.videoEmbedHTML(embed));
@@ -3940,7 +3731,6 @@ export class FableEditor implements FableEditorApi {
         this.clearImgPlaceholderSel();
         this.clearVphPlaceholderSel();
         this.clearVidHandles();
-        this.clearMathSel();
         this.shell.dir = this.dir();
         this.ed.dir = this.dir();
         if (this.options.menubar) this.buildMenubar();

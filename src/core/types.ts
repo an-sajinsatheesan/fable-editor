@@ -59,6 +59,17 @@ export interface EditorInitOptions {
   videoUploadHandler?: (file: File) => Promise<string>;
   /** Called when videoUploadHandler rejects, so the host app can surface it. */
   onVideoUploadError?: (error: unknown, file: File) => void;
+  /** Accent color used for active states, primary buttons and selection outlines.
+   *  Any CSS color. Defaults to `#df3c2b`. Applied as the `--fable-primary` CSS
+   *  variable on the document root (dialogs/popups render outside the editor shell). */
+  primaryColor?: string;
+  /** Background of each toolbar button group (the rounded pills). Any CSS
+   *  color/gradient. Defaults to `#f1f3f6`. Applied as `--fable-tgrp-bg`. */
+  toolbarGroupBackground?: string;
+  /** Font family for the editor UI (menubar, toolbar, dialogs, popups). Defaults to
+   *  a 'Noto Sans' stack — load the Noto Sans webfont in your app to use it, or pass
+   *  your own family here. Applied as `--fable-ui-font`. */
+  uiFontFamily?: string;
 }
 
 export interface FableEditorApi {

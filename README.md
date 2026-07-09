@@ -10,11 +10,11 @@ A rich text editor packaged as an npm library with first-class React and Angular
 | Tables | Resize handles, row/column insert & delete, cell/row/column/table properties, context toolbar |
 | Paste handling | PowerPaste-style clean paste from Word / Google Docs / Excel |
 | Internationalization | English / Arabic, automatic RTL/LTR switching |
-| Fonts & formatting | Configurable font list (`fontFamilyFormats`), sizes, line-height, word-spacing, text/background color, change case |
+| Fonts & formatting | Configurable font list (`fontFamilyFormats`), sizes, line-height, word-spacing, letter-spacing, text/background color, change case |
+| Theming | `primaryColor` (accent, default `#df3c2b`), `toolbarGroupBackground` and `uiFontFamily` (default Noto Sans stack) options restyle the editor chrome via CSS variables |
 | Custom content styling | `contentStyle` injects scoped CSS into the editable area (e.g. default font/size) |
 | Images | Placeholder upload UI, drag-and-drop, configurable accepted file types (`imageFileTypes`), pluggable async upload handler |
 | Video | Insert/edit dialog with **General** (source URL / upload / width / height), **Embed** (paste embed code) and **Advanced** (alternative source, poster image) tabs. YouTube / Vimeo / Dailymotion page URLs become embedded players — including when pasted directly into the editor. Template media slots can host a video instead of an image. |
-| Math formulas | Insert inline or multi-line LaTeX derivations, rendered with [KaTeX](https://katex.org) — click an inserted formula to edit or delete it. Pasting LaTeX from the clipboard (`$…$`, `$$…$$`, `\(…\)`, `\[…\]`, `\begin{…}…\end{…}`) auto-renders it, and typing `$x^2$` inline converts as soon as the closing `$` is typed |
 | Documents | Import `.docx` files, source-code view, print preview |
 | Productivity | Undo/redo, revision history, autosave draft restore, word count, special characters & emoji pickers (category tabs + glyph grid), page breaks |
 | Fullscreen | Toggle fullscreen editing |
@@ -73,18 +73,26 @@ editor.destroy();
 | `videoFileTypes` | `string[]` | `['video/mp4','video/webm','video/ogg']` | `accept` list for the native video file picker. |
 | `videoUploadHandler` | `(file: File) => Promise<string>` | — | Resolve with a URL after uploading; omit to inline videos as base64. |
 | `onVideoUploadError` | `(error, file) => void` | — | Called when `videoUploadHandler` rejects. |
+| `primaryColor` | `string` | `'#df3c2b'` | Accent color for active states, primary buttons and selection outlines. Any CSS color. Applied as the `--fable-primary` CSS variable. |
+| `toolbarGroupBackground` | `string` | `'#f1f3f6'` | Background of each toolbar button group (the rounded pills). Applied as `--fable-tgrp-bg`. |
+| `uiFontFamily` | `string` | Noto Sans stack | Font family for the editor UI (menubar, toolbar, dialogs). Load the Noto Sans webfont in your app to use the default, or pass your own family. Applied as `--fable-ui-font`. |
 | `draftKey` | `string` | current page path | Storage key suffix for autosaved drafts. |
 | `onChange` / `onReady` | functions | — | Content-change and ready callbacks (usually set by the React/Angular wrapper instead). |
 
-> **Math formulas:** the "Insert math formula" toolbar/menu item renders LaTeX with [KaTeX](https://katex.org), which FableEditor uses as a rendering dependency but does not bundle the stylesheet for (to avoid shipping KaTeX's webfonts in every install). If you use this feature, also import KaTeX's CSS once in your app: `import 'katex/dist/katex.min.css'`.
+### Theming
 
-### Math from the clipboard / keyboard
+The editor's accent color, toolbar group background and UI font are driven by CSS variables, so they can be set per instance:
 
-Besides the dialog, formulas can enter the document two more ways — the regular paste pipeline is untouched, these only kick in when the clipboard is *entirely* one formula:
+```ts
+new FableEditor({
+  target: el,
+  primaryColor: '#df3c2b',                 // accent (default)
+  toolbarGroupBackground: '#f1f3f6',       // toolbar pill background (default)
+  uiFontFamily: "'Noto Sans', sans-serif"  // UI font (default stack)
+});
+```
 
-- **Paste** `$$…$$`, `\[…\]` or a `\begin{…}…\end{…}` environment → a **block** formula on its own line. A derivation pasted as separate lines gets each step on its own row automatically.
-- **Paste** `\(…\)` or a LaTeX-looking `$…$` → an **inline** formula at the caret (same line). Plain text like `$5 and $10` is left alone.
-- **Type** `$x^2$` — the moment the closing `$` is typed, the run converts to an inline formula (only when it parses as valid LaTeX; a literal `$5` stays text).
+The same values are available as React props / Angular inputs. The UI font defaults to a **Noto Sans** stack — load the webfont in your app (e.g. from Google Fonts) or pass any family you've already loaded. Alternatively, set the variables yourself in CSS: `--fable-primary`, `--fable-tgrp-bg`, `--fable-ui-font`.
 
 ### Toolbar & menubar configuration
 
@@ -100,7 +108,7 @@ new FableEditor({
 });
 ```
 
-Available toolbar items: `undo redo preview print importword revhistory fontfamily fontsize fontsizeincrease fontsizedecrease bold italic underline strikethrough forecolor backcolor alignleft aligncenter alignright alignjustify bullist numlist outdent indent link blockquote changecase lineheight wordspacing removeformat blocks ltr rtl quickimage quickvideo quicktable mathformula template charmap emoji fullscreen sourcecode`. The TinyMCE names `styles` (→ `blocks`), `image` (→ `quickimage`), `media` (→ `quickvideo`) and `table` (→ `quicktable`) are accepted as aliases, so a typical TinyMCE toolbar string works unchanged. Unknown tokens are skipped with a console warning. Menubar keys: `file edit view insert format tools table help`.
+Available toolbar items: `undo redo preview print importword revhistory fontfamily fontsize fontsizeincrease fontsizedecrease bold italic underline strikethrough forecolor backcolor alignleft aligncenter alignright alignjustify bullist numlist outdent indent link blockquote changecase lineheight wordspacing letterspacing removeformat blocks ltr rtl quickimage quickvideo quicktable template charmap emoji fullscreen sourcecode`. The TinyMCE names `styles` (→ `blocks`), `image` (→ `quickimage`), `media` (→ `quickvideo`) and `table` (→ `quicktable`) are accepted as aliases, so a typical TinyMCE toolbar string works unchanged. Unknown tokens are skipped with a console warning. Menubar keys: `file edit view insert format tools table help`.
 
 ## React
 
@@ -125,7 +133,7 @@ function App() {
 
 `toolbar`/`menubar` accept the same layout strings as the core option (see [Toolbar & menubar configuration](#toolbar--menubar-configuration)), so each app can show exactly the controls it needs.
 
-Props: `value`, `defaultValue`, `onChange`, `language`, `height`, `menubar`, `toolbar`, `statusbar`, `readonly`, `fontFamilyFormats`, `contentStyle`, `imageFileTypes`, `imageUploadHandler`, `onImageUploadError`, `videoFileTypes`, `videoUploadHandler`, `onVideoUploadError`, `init`, `className`, `style` (see the [`init` options](#init-options) table above — every option is also a top-level prop). A ref exposes `getContent`, `setContent`, `insertContent`, `setLanguage`, `focus`, `destroy`.
+Props: `value`, `defaultValue`, `onChange`, `language`, `height`, `menubar`, `toolbar`, `statusbar`, `readonly`, `primaryColor`, `toolbarGroupBackground`, `uiFontFamily`, `fontFamilyFormats`, `contentStyle`, `imageFileTypes`, `imageUploadHandler`, `onImageUploadError`, `videoFileTypes`, `videoUploadHandler`, `onVideoUploadError`, `init`, `className`, `style` (see the [`init` options](#init-options) table above — every option is also a top-level prop). A ref exposes `getContent`, `setContent`, `insertContent`, `setLanguage`, `focus`, `destroy`.
 
 ## Angular
 
@@ -160,7 +168,7 @@ Use in a template:
 </fable-editor>
 ```
 
-Inputs: `language`, `height`, `menubar`, `toolbar`, `statusbar`, `readonly`, `init`. `menubar`/`toolbar` accept a string directly (e.g. `[toolbar]="'undo redo | bold italic'"`); `fontFamilyFormats`, `contentStyle`, `imageFileTypes`, `imageUploadHandler`, `onImageUploadError`, `videoFileTypes`, `videoUploadHandler`, and `onVideoUploadError` aren't top-level inputs — pass them via `[init]="{ contentStyle: '...' }"` (see the [`init` options](#init-options) table above). Outputs: `editorChange`, `editorReady`. Works with `ngModel` and `formControlName`.
+Inputs: `language`, `height`, `menubar`, `toolbar`, `statusbar`, `readonly`, `primaryColor`, `toolbarGroupBackground`, `uiFontFamily`, `init`. `menubar`/`toolbar` accept a string directly (e.g. `[toolbar]="'undo redo | bold italic'"`); `fontFamilyFormats`, `contentStyle`, `imageFileTypes`, `imageUploadHandler`, `onImageUploadError`, `videoFileTypes`, `videoUploadHandler`, and `onVideoUploadError` aren't top-level inputs — pass them via `[init]="{ contentStyle: '...' }"` (see the [`init` options](#init-options) table above). Outputs: `editorChange`, `editorReady`. Works with `ngModel` and `formControlName`.
 
 ## Development & testing
 

@@ -49,83 +49,6 @@ afterEach(() => {
   document.querySelectorAll('.dlg, .ovl, .imgctx').forEach((el) => el.remove());
 });
 
-describe('math paste', () => {
-  it('pasting $$…$$ inserts a block formula', () => {
-    paste(container, '$$x = \\frac{1}{2}$$');
-    const el = container.querySelector('.earea .math-fable') as HTMLElement;
-    expect(el).toBeInTheDocument();
-    expect(el.tagName).toBe('DIV');
-    expect(el.classList.contains('math-fable-block')).toBe(true);
-    expect(el.dataset.latex).toBe('x = \\frac{1}{2}');
-    expect(el.innerHTML).toContain('katex');
-  });
-
-  it('pasting a multi-line derivation joins the steps with \\\\ row breaks', () => {
-    paste(container, '$$2x + 3 = 11\n2x = 8\nx = 4$$');
-    const el = container.querySelector('.earea .math-fable-block') as HTMLElement;
-    expect(el).toBeInTheDocument();
-    expect(el.dataset.latex).toBe('2x + 3 = 11 \\\\ 2x = 8 \\\\ x = 4');
-  });
-
-  it('pasting \\(…\\) or LaTeX-ish $…$ inserts an inline formula on the same line', () => {
-    paste(container, '\\(a^2 + b^2 = c^2\\)');
-    let el = container.querySelector('.earea .math-fable') as HTMLElement;
-    expect(el.tagName).toBe('SPAN');
-    el.remove();
-    caretIn(container, editor);
-    paste(container, '$e^{i\\pi} = -1$');
-    el = container.querySelector('.earea .math-fable') as HTMLElement;
-    expect(el.tagName).toBe('SPAN');
-    expect(el.dataset.latex).toBe('e^{i\\pi} = -1');
-  });
-
-  it('pasting a \\begin environment inserts a block formula', () => {
-    paste(container, '\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}');
-    const el = container.querySelector('.earea .math-fable-block') as HTMLElement;
-    expect(el).toBeInTheDocument();
-  });
-
-  it('does NOT convert ordinary text with dollar amounts', () => {
-    paste(container, '$5 and $10');
-    expect(container.querySelector('.earea .math-fable')).toBeNull();
-    expect(container.querySelector('.earea')!.textContent).toContain('$5 and $10');
-  });
-
-  it('does not touch HTML pastes (normal paste pipeline unchanged)', () => {
-    paste(container, '$$x^2$$', '<p>$$x^2$$</p>');
-    expect(container.querySelector('.earea .math-fable')).toBeNull();
-  });
-});
-
-describe('math typing', () => {
-  function typeDollarAfter(text: string): void {
-    const ed = container.querySelector('.earea') as HTMLElement;
-    const p = ed.firstElementChild as HTMLElement;
-    p.textContent = text;
-    const node = p.firstChild as Text;
-    const range = document.createRange();
-    range.setStart(node, node.length);
-    range.collapse(true);
-    const sel = window.getSelection()!;
-    sel.removeAllRanges();
-    sel.addRange(range);
-    ed.dispatchEvent(new KeyboardEvent('keydown', { key: '$', bubbles: true, cancelable: true }));
-  }
-
-  it('typing the closing $ of "$x^2$" converts the run into an inline formula', () => {
-    typeDollarAfter('the square $x^2');
-    const el = container.querySelector('.earea .math-fable') as HTMLElement;
-    expect(el).toBeInTheDocument();
-    expect(el.dataset.latex).toBe('x^2');
-    expect(container.querySelector('.earea')!.textContent).not.toContain('$x^2');
-  });
-
-  it('leaves plain-text dollars alone ("$5 and 3" + $)', () => {
-    typeDollarAfter('$5 and 3');
-    expect(container.querySelector('.earea .math-fable')).toBeNull();
-  });
-});
-
 describe('video dialog and embeds', () => {
   it('the toolbar video button opens a dialog with General / Embed / Advanced tabs', () => {
     toolbarButton(container, 'Insert video').click();
@@ -217,5 +140,52 @@ describe('character map and emoji pickers', () => {
     // picking an emoji closes the dialog
     (grid.querySelector('button') as HTMLElement).click();
     expect(document.body.querySelector('.dlg')).toBeNull();
+  });
+});
+
+describe('theming options', () => {
+  it('applies primaryColor / toolbarGroupBackground / uiFontFamily as CSS variables', () => {
+    const c2 = document.createElement('div');
+    document.body.appendChild(c2);
+    const ed2 = new FableEditor({
+      target: c2,
+      primaryColor: '#00aa00',
+      toolbarGroupBackground: '#ffeeee',
+      uiFontFamily: 'Tahoma, sans-serif'
+    });
+    const rs = document.documentElement.style;
+    expect(rs.getPropertyValue('--fable-primary')).toBe('#00aa00');
+    expect(rs.getPropertyValue('--fable-tgrp-bg')).toBe('#ffeeee');
+    expect(rs.getPropertyValue('--fable-ui-font')).toBe('Tahoma, sans-serif');
+    ed2.destroy();
+    c2.remove();
+    ['--fable-primary', '--fable-tgrp-bg', '--fable-ui-font'].forEach((v) => rs.removeProperty(v));
+  });
+
+  it('leaves the CSS variables unset when no theme options are given (CSS defaults win)', () => {
+    expect(document.documentElement.style.getPropertyValue('--fable-primary')).toBe('');
+  });
+});
+
+describe('letter spacing', () => {
+  it('toolbar menu applies letter-spacing to the current block and Normal clears it', () => {
+    toolbarButton(container, 'Letter spacing').click();
+    let pop = document.body.querySelector('.pop') as HTMLElement;
+    expect(pop).toBeInTheDocument();
+    const item = Array.from(pop.querySelectorAll('button')).find(
+      (b) => b.textContent!.includes('1.5px')
+    ) as HTMLElement;
+    expect(item).toBeTruthy();
+    item.click();
+    const p = container.querySelector('.earea p') as HTMLElement;
+    expect(p.style.letterSpacing).toBe('1.5px');
+
+    toolbarButton(container, 'Letter spacing').click();
+    pop = document.body.querySelector('.pop') as HTMLElement;
+    const normal = Array.from(pop.querySelectorAll('button')).find(
+      (b) => b.textContent!.includes('Normal')
+    ) as HTMLElement;
+    normal.click();
+    expect(p.style.letterSpacing).toBe('');
   });
 });
