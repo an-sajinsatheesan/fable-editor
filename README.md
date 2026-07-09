@@ -2,6 +2,8 @@
 
 A rich text editor packaged as an npm library with first-class React and Angular wrappers. Built from the original standalone `fable-editor.html`/`fable-editor.js` demo, preserving the full feature set.
 
+![FableEditor preview](https://raw.githubusercontent.com/an-sajinsatheesan/fable-editor/main/docs/preview.png)
+
 ## Features
 
 | Feature | Details |
