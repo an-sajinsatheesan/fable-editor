@@ -96,6 +96,7 @@ export interface I18nStrings {
   unlink: string;
   lineheight: string;
   wordspacing: string;
+  letterspacing: string;
   changecase: string;
   lowercase: string;
   uppercase: string;
@@ -149,12 +150,6 @@ export interface I18nStrings {
   videourlph: string;
   insertvideo: string;
   dropvideo: string;
-  mathformula: string;
-  mathdlgttl: string;
-  mathderivation: string;
-  mathlatex: string;
-  editmath: string;
-  deletemath: string;
   videodlgttl: string;
   vidgeneral: string;
   vidembed: string;
@@ -279,6 +274,7 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     unlink: 'Remove link',
     lineheight: 'Line height',
     wordspacing: 'Word spacing',
+    letterspacing: 'Letter spacing',
     changecase: 'Change case',
     lowercase: 'Lowercase',
     uppercase: 'Uppercase',
@@ -332,12 +328,6 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     videourlph: 'Paste video URL…',
     insertvideo: 'Insert',
     dropvideo: 'Drop video here',
-    mathformula: 'Insert math formula',
-    mathdlgttl: 'Insert Math Formula',
-    mathderivation: 'Multi-line derivation',
-    mathlatex: 'LaTeX',
-    editmath: 'Edit formula',
-    deletemath: 'Delete formula',
     videodlgttl: 'Insert/edit video',
     vidgeneral: 'General',
     vidembed: 'Embed',
@@ -460,6 +450,7 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     unlink: 'إزالة الرابط',
     lineheight: 'تباعد الأسطر',
     wordspacing: 'تباعد الكلمات',
+    letterspacing: 'تباعد الأحرف',
     changecase: 'تغيير حالة الأحرف',
     lowercase: 'أحرف صغيرة',
     uppercase: 'أحرف كبيرة',
@@ -513,12 +504,6 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     videourlph: 'الصق رابط الفيديو…',
     insertvideo: 'إدراج',
     dropvideo: 'أسقط الفيديو هنا',
-    mathformula: 'إدراج معادلة رياضية',
-    mathdlgttl: 'إدراج معادلة رياضية',
-    mathderivation: 'اشتقاق متعدد الأسطر',
-    mathlatex: 'LaTeX',
-    editmath: 'تعديل المعادلة',
-    deletemath: 'حذف المعادلة',
     videodlgttl: 'إدراج/تعديل فيديو',
     vidgeneral: 'عام',
     vidembed: 'تضمين',

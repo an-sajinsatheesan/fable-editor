@@ -95,7 +95,6 @@
     "@playwright/test": "^1.61.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@types/katex": "^0.16.8",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
@@ -110,8 +109,5 @@
     "vite": "^5.3.0",
     "vite-plugin-dts": "^3.9.0",
     "vitest": "^4.1.9"
-  },
-  "dependencies": {
-    "katex": "^0.17.0"
   }
 }

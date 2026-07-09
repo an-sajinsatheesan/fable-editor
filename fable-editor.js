@@ -49,8 +49,6 @@ en:{ dir:'ltr',
   video:'Video',quickvideo:'Insert video',deletevideo:'Delete video',
   uploadvideo:'Upload from computer',videolink:'Insert from URL',
   videourlph:'Paste video URL…',insertvideo:'Insert',dropvideo:'Drop video here',
-  mathformula:'Insert math formula',mathdlgttl:'Insert Math Formula',
-  mathderivation:'Multi-line derivation',editmath:'Edit formula',deletemath:'Delete formula',
   videodlgttl:'Insert/edit video',vidgeneral:'General',vidembed:'Embed',vidadvanced:'Advanced',
   vidsource:'Source',vidembedhint:'Paste your embed code below:',
   vidaltsource:'Alternative source URL',vidposter:'Media poster (Image URL)',
@@ -101,8 +99,6 @@ ar:{ dir:'rtl',
   video:'فيديو',quickvideo:'إدراج فيديو',deletevideo:'حذف الفيديو',
   uploadvideo:'رفع من الجهاز',videolink:'إدراج من رابط',
   videourlph:'الصق رابط الفيديو…',insertvideo:'إدراج',dropvideo:'أسقط الفيديو هنا',
-  mathformula:'إدراج معادلة رياضية',mathdlgttl:'إدراج معادلة رياضية',
-  mathderivation:'اشتقاق متعدد الأسطر',editmath:'تعديل المعادلة',deletemath:'حذف المعادلة',
   videodlgttl:'إدراج/تعديل فيديو',vidgeneral:'عام',vidembed:'تضمين',vidadvanced:'متقدم',
   vidsource:'المصدر',vidembedhint:'الصق كود التضمين أدناه:',
   vidaltsource:'رابط مصدر بديل',vidposter:'صورة الغلاف (رابط الصورة)',
@@ -216,7 +212,6 @@ const IC = {
  tpltop:S('<rect x="5" y="3" width="14" height="9" rx=".8"/><path d="M3 15h18M3 18h18M3 21h12"/>'),
  tplcenter:S('<path d="M3 4h18M3 7h18M3 10h12"/><rect x="5" y="12.5" width="14" height="9" rx=".8"/>'),
  video:S('<rect x="3" y="6" width="13" height="12" rx="1.5"/><path d="M17 10l4-2.5v9L17 14z"/>'),
- mathic:S('<text x="3" y="18" font-size="17" stroke="none" fill="#222f3e" font-family="Georgia" font-style="italic">&#8721;</text>'),
  editic:S('<path d="M4 20l1-4.5L15.5 5 19 8.5 8.5 19 4 20z"/><path d="M13.5 6.5l4 4"/>'),
  emojiic:S('<circle cx="12" cy="12" r="8.5"/><path d="M8.6 14.3a4.6 4.6 0 0 0 6.8 0"/><path d="M9.2 9.6v.7M14.8 9.6v.7"/>')
 };
@@ -492,7 +487,6 @@ function buildToolbar(){
         {label:t('quickimage'),icon:IC.image,action:insertImagePlaceholder},
         {label:t('quickvideo'),icon:IC.video,action:()=>videoDlg()},
         {label:t('quicktable'),icon:IC.tableic,action:()=>tableGrid(btn)},
-        {label:t('mathformula'),icon:IC.mathic,action:()=>mathDlg()},
         {label:t('template'),icon:IC.templateic,action:()=>templateMenu(btn)},
         {label:t('charmap'),icon:IC.charic,action:()=>charMap()},
         {label:t('emoji'),icon:IC.emojiic,action:()=>emojiMap()}
@@ -524,7 +518,6 @@ function buildMenubar(){
            mItem('sourcecode',IC.srcic,sourceDlg) ],
     insert:[ mItem('image',IC.image,insertImagePlaceholder),
            mItem('video',IC.video,()=>videoDlg()),
-           mItem('mathformula',IC.mathic,()=>mathDlg()),
            {label:t('inserttable'),icon:IC.tableic,action:()=>tableGrid(menubar.children[6]||menubar)},
            {label:t('template'),icon:IC.templateic,action:()=>templateMenu(menubar.children[3]||menubar)},
            mItem('hr',IC.hric,()=>exec('insertHorizontalRule')), '|',
@@ -1243,12 +1236,12 @@ function videoDlg(){
 let embedActive=null, embedCtx=null;
 function clearEmbedSel(){
   embedCtx?.remove(); embedCtx=null;
-  embedActive?.classList.remove('math-selected'); embedActive=null;
+  embedActive?.classList.remove('embed-selected'); embedActive=null;
 }
 function selectEmbedEl(el){
   if(embedActive===el) return;
   clearEmbedSel();
-  embedActive=el; el.classList.add('math-selected');
+  embedActive=el; el.classList.add('embed-selected');
   embedCtx=document.createElement('div');
   embedCtx.className='tblctx img-ph-ctx'; embedCtx.dir=t('dir');
   embedCtx.append(ctxBtn(IC.trash, t('deletevideo'), ()=>{ el.remove(); clearEmbedSel(); onChange(); }));
@@ -1282,175 +1275,8 @@ window.addEventListener('scroll', positionEmbedCtx, true);
 window.addEventListener('resize', positionEmbedCtx);
 ed.addEventListener('input', positionEmbedCtx);
 
-/* ---------------------------------------------------------- math / LaTeX formulas */
+/* ---------------------------------------------------------- html attr escaping */
 function escapeAttr(s){ return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
-function unescapeAttr(s){ return s.replace(/&quot;/g,'"').replace(/&amp;/g,'&'); }
-function renderMathHTML(latex, block){
-  try{ return katex.renderToString(latex, {throwOnError:false, displayMode:block, strict:'ignore'}); }
-  catch(e){ return ''; }
-}
-/* shared by the math dialog, math paste and math typing: renders `src` and
-   inserts it at the caret as the standard math element */
-function insertMathElement(src, block){
-  const latex = block ? `\\begin{aligned}${src}\\end{aligned}` : src;
-  const rendered = renderMathHTML(latex, block);
-  const tag = block ? 'div' : 'span';
-  document.execCommand('insertHTML', false,
-    `<${tag} class="math-fable${block?' math-fable-block':''}" contenteditable="false" data-latex="${escapeAttr(src)}">${rendered}</${tag}>`);
-}
-/* recognizes a plain-text clipboard payload that is entirely one math formula:
-   $$…$$ / \[…\] (block), \(…\) (inline), a \begin{…}…\end{…} environment (block),
-   or $…$ (inline — only when the inside looks like LaTeX, so "$50" stays text) */
-function mathFromClipboard(text){
-  const t=text.trim();
-  if(!t) return null;
-  const block = t.match(/^\$\$([\s\S]+)\$\$$/) || t.match(/^\\\[([\s\S]+)\\\]$/);
-  if(block){
-    const src=block[1].trim();
-    if(!src || src.includes('$')) return null;
-    return {latex:joinDerivationLines(src), block:true};
-  }
-  if(/^\\begin\{[a-zA-Z*]+\}[\s\S]+\\end\{[a-zA-Z*]+\}$/.test(t))
-    return {latex:joinDerivationLines(t), block:true};
-  const inline = t.match(/^\\\(([\s\S]+)\\\)$/) || t.match(/^\$([^$\n]+)\$$/);
-  if(inline){
-    const src=inline[1].trim();
-    if(!src || src.includes('$')) return null;
-    if(t.startsWith('$') && !/[\\^_{}=]/.test(src)) return null;
-    return {latex:src, block:false};
-  }
-  return null;
-}
-/* a derivation pasted as separate lines has no explicit \\ row breaks — add them */
-function joinDerivationLines(src){
-  if(!/\n/.test(src)) return src;
-  if(/\\\\/.test(src) || /\\begin\{/.test(src)) return src.replace(/\s*\n\s*/g,' ');
-  return src.split(/\n+/).map(l=>l.trim()).filter(Boolean).join(' \\\\ ');
-}
-/* typing "$…$" converts to an inline formula the moment the closing "$" is
-   typed; only kicks in when the run parses as valid LaTeX-ish syntax */
-function tryMathTyping(e){
-  const sel=window.getSelection();
-  if(!sel || !sel.isCollapsed || !sel.anchorNode) return;
-  const node=sel.anchorNode;
-  if(node.nodeType!==3 || !ed.contains(node)) return;
-  if(node.parentElement && node.parentElement.closest('.math-fable, pre, code')) return;
-  const before=(node.textContent||'').slice(0, sel.anchorOffset);
-  const m=before.match(/(?:^|[^\\$])\$([^$]+)$/);
-  if(!m) return;
-  const src=m[1];
-  if(/^\s|\s$/.test(src) || !/[\\^_{}=]/.test(src)) return;
-  const rendered=renderMathHTML(src, false);
-  if(!rendered || rendered.includes('katex-error')) return;
-  e.preventDefault();
-  const range=document.createRange();
-  range.setStart(node, sel.anchorOffset - src.length - 1);
-  range.setEnd(node, sel.anchorOffset);
-  sel.removeAllRanges(); sel.addRange(range);
-  insertMathElement(src, false);
-  onChange();
-}
-ed.addEventListener('keydown', e=>{
-  if(e.key==='$' && !e.ctrlKey && !e.metaKey && !e.altKey) tryMathTyping(e);
-});
-function mathDlg(existing){
-  saveSel();
-  const isBlock = existing ? existing.classList.contains('math-fable-block') : false;
-  const initialLatex = existing && existing.dataset.latex ? unescapeAttr(existing.dataset.latex) : '';
-  let ta, derivChk, preview;
-  const updatePreview=()=>{
-    const src=ta.value||'', block=derivChk.checked;
-    const latex=block?`\\begin{aligned}${src}\\end{aligned}`:src;
-    preview.innerHTML = renderMathHTML(latex, block);
-  };
-  dialog(t('mathdlgttl'), body=>{
-    ta=document.createElement('textarea'); ta.value=initialLatex;
-    ta.placeholder='e.g. x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}';
-    ta.style.cssText='width:360px;max-width:100%;min-height:80px;font-family:monospace;font-size:13px';
-    const chkRow=document.createElement('label');
-    chkRow.style.cssText='display:flex;align-items:center;gap:6px;margin:8px 0;font-size:13.5px;color:#445';
-    derivChk=document.createElement('input'); derivChk.type='checkbox'; derivChk.checked=isBlock;
-    chkRow.append(derivChk, document.createTextNode(t('mathderivation')));
-    preview=document.createElement('div'); preview.className='math-preview';
-    preview.style.cssText='min-height:40px;margin-top:8px;padding:10px;border:1px solid #e1e5ea;border-radius:6px;overflow:auto';
-    ta.addEventListener('input', updatePreview);
-    derivChk.addEventListener('change', updatePreview);
-    body.append(ta, chkRow, preview);
-    setTimeout(()=>{ ta.focus(); updatePreview(); }, 0);
-  },[
-    {label:t('cancel'),action:closeDlg},
-    {label:t('save'),pri:true,action:()=>{
-      const src=ta.value.trim();
-      closeDlg();
-      if(!src) return;
-      const block=derivChk.checked;
-      const latex=block?`\\begin{aligned}${src}\\end{aligned}`:src;
-      const rendered=renderMathHTML(latex, block);
-      const dataLatex=escapeAttr(src);
-      if(existing){
-        existing.className = block?'math-fable math-fable-block':'math-fable';
-        existing.dataset.latex = dataLatex;
-        existing.innerHTML = rendered;
-        clearMathSel(); onChange();
-        return;
-      }
-      restoreSel();
-      const tag = block?'div':'span';
-      document.execCommand('insertHTML', false,
-        `<${tag} class="math-fable${block?' math-fable-block':''}" contenteditable="false" data-latex="${dataLatex}">${rendered}</${tag}>`);
-      onChange();
-    }}
-  ]);
-}
-let mathActive=null, mathCtx=null;
-function clearMathSel(){
-  mathCtx?.remove(); mathCtx=null;
-  mathActive?.classList.remove('math-selected'); mathActive=null;
-}
-function selectMathEl(el){
-  if(mathActive===el) return;
-  clearMathSel();
-  mathActive=el; el.classList.add('math-selected');
-  mathCtx=buildMathCtxToolbar(el);
-  positionMathCtx();
-}
-function buildMathCtxToolbar(el){
-  const ctx=document.createElement('div'); ctx.className='tblctx img-ph-ctx'; ctx.dir=t('dir');
-  ctx.append(
-    ctxBtn(IC.editic, t('editmath'), ()=>mathDlg(el)),
-    ctxSep(),
-    ctxBtn(IC.trash, t('deletemath'), ()=>{ el.remove(); clearMathSel(); onChange(); })
-  );
-  document.body.appendChild(ctx);
-  return ctx;
-}
-function positionMathCtx(){
-  if(!mathActive || !document.body.contains(mathActive)){ clearMathSel(); return; }
-  const r=mathActive.getBoundingClientRect();
-  if(!mathCtx) return;
-  const cw=mathCtx.offsetWidth, ch=mathCtx.offsetHeight;
-  let cx=r.left+scrollX+(r.width-cw)/2;
-  cx=Math.max(8+scrollX, Math.min(cx, scrollX+innerWidth-cw-8));
-  let cy=r.top+scrollY-ch-8;
-  if(cy<scrollY+4) cy=r.bottom+scrollY+8;
-  mathCtx.style.left=cx+'px';
-  mathCtx.style.top=cy+'px';
-}
-ed.addEventListener('mousedown', e=>{
-  const el = e.target.closest && e.target.closest('.math-fable');
-  if(el && ed.contains(el)){ e.preventDefault(); selectMathEl(el); }
-  else clearMathSel();
-});
-document.addEventListener('mousedown', e=>{
-  if(!mathActive) return;
-  if(ed.contains(e.target) || (mathCtx && mathCtx.contains(e.target))) return;
-  clearMathSel();
-});
-ed.addEventListener('scroll', positionMathCtx);
-window.addEventListener('scroll', positionMathCtx, true);
-window.addEventListener('resize', positionMathCtx);
-ed.addEventListener('input', positionMathCtx);
-
 /* ---------------------------------------------------------- templates */
 const TPL_LAYOUTS=['img-left','img-right','img-top','img-center'];
 const TPL_LABEL={'img-left':'tplimgleft','img-right':'tplimgright','img-top':'tplimgtop','img-center':'tplimgcenter'};
@@ -2161,14 +1987,10 @@ ed.addEventListener('paste', e=>{
     return;
   }
   if(!html){
-    /* plain-text pastes get two additive pre-checks before the normal text
-       pipeline runs (the paste engine itself is untouched): a clipboard that
-       is entirely one LaTeX formula/derivation becomes a rendered math
-       element, and a bare video page URL (YouTube & co.) becomes an
-       embedded player; anything else falls through unchanged */
+    /* additive pre-check before the normal text pipeline runs (the paste
+       engine itself is untouched): a bare video page URL (YouTube & co.)
+       becomes an embedded player; anything else falls through unchanged */
     const raw=cd.getData('text/plain');
-    const math=mathFromClipboard(raw);
-    if(math){ insertMathElement(math.latex, math.block); onChange(); return; }
     const embed=/^\S+$/.test(raw.trim()) ? videoEmbedUrl(raw.trim()) : null;
     if(embed){ document.execCommand('insertHTML',false,videoEmbedHTML(embed)); onChange(); return; }
   }
