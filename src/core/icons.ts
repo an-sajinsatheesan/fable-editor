@@ -231,7 +231,15 @@ export const IC: Record<string, string> = {
   ol_alpha: LIST(['a', 'b', 'c']),
   ol_roman: LIST(['i', 'ii', 'iii'], 6.5),
   ol_alphau: LIST(['A', 'B', 'C']),
-  ol_romanu: LIST(['I', 'II', 'III'], 6.5)
+  ol_romanu: LIST(['I', 'II', 'III'], 6.5),
+  video: S('<rect x="3" y="6" width="13" height="12" rx="1.5"/><path d="M16 10l5-3v10l-5-3z"/>'),
+  editic: S('<path d="M4 20l1-4.5L15.5 5 19 8.5 8.5 19 4 20z"/><path d="M13.5 6.5l4 4"/>'),
+  mathic: S(
+    '<text x="2" y="18" font-size="17" stroke="none" fill="#222f3e" font-family="Georgia, \'Times New Roman\', serif" font-style="italic">&#8721;</text>'
+  ),
+  emojiic: S(
+    '<circle cx="12" cy="12" r="8.5"/><path d="M8.6 14.3a4.6 4.6 0 0 0 6.8 0"/><path d="M9.2 9.6v.7M14.8 9.6v.7"/>'
+  )
 };
 
 export const TXT = (html: string) => `<span class="txt">${html}</span>`;

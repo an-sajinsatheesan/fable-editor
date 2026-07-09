@@ -141,6 +141,45 @@ export interface I18nStrings {
   tplimgtop: string;
   tplimgcenter: string;
   deltemplate: string;
+  video: string;
+  quickvideo: string;
+  deletevideo: string;
+  uploadvideo: string;
+  videolink: string;
+  videourlph: string;
+  insertvideo: string;
+  dropvideo: string;
+  mathformula: string;
+  mathdlgttl: string;
+  mathderivation: string;
+  mathlatex: string;
+  editmath: string;
+  deletemath: string;
+  videodlgttl: string;
+  vidgeneral: string;
+  vidembed: string;
+  vidadvanced: string;
+  vidsource: string;
+  vidembedhint: string;
+  vidaltsource: string;
+  vidposter: string;
+  emoji: string;
+  chcat_currency: string;
+  chcat_text: string;
+  chcat_math: string;
+  chcat_arrows: string;
+  chcat_symbols: string;
+  chcat_latin: string;
+  chcat_arabic: string;
+  emcat_smileys: string;
+  emcat_people: string;
+  emcat_animals: string;
+  emcat_food: string;
+  emcat_travel: string;
+  emcat_activities: string;
+  emcat_objects: string;
+  emcat_symbols: string;
+  emcat_flags: string;
 }
 
 export const I18N: Record<EditorLanguage, I18nStrings> = {
@@ -284,7 +323,46 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     tplimgright: 'Image right, text left',
     tplimgtop: 'Image top, text below',
     tplimgcenter: 'Text top, image center',
-    deltemplate: 'Delete template'
+    deltemplate: 'Delete template',
+    video: 'Video',
+    quickvideo: 'Insert video',
+    deletevideo: 'Delete video',
+    uploadvideo: 'Upload from computer',
+    videolink: 'Insert from URL',
+    videourlph: 'Paste video URL…',
+    insertvideo: 'Insert',
+    dropvideo: 'Drop video here',
+    mathformula: 'Insert math formula',
+    mathdlgttl: 'Insert Math Formula',
+    mathderivation: 'Multi-line derivation',
+    mathlatex: 'LaTeX',
+    editmath: 'Edit formula',
+    deletemath: 'Delete formula',
+    videodlgttl: 'Insert/edit video',
+    vidgeneral: 'General',
+    vidembed: 'Embed',
+    vidadvanced: 'Advanced',
+    vidsource: 'Source',
+    vidembedhint: 'Paste your embed code below:',
+    vidaltsource: 'Alternative source URL',
+    vidposter: 'Media poster (Image URL)',
+    emoji: 'Emojis…',
+    chcat_currency: 'Currency',
+    chcat_text: 'Text & punctuation',
+    chcat_math: 'Mathematical',
+    chcat_arrows: 'Arrows',
+    chcat_symbols: 'Symbols',
+    chcat_latin: 'Extended Latin',
+    chcat_arabic: 'Arabic',
+    emcat_smileys: 'Smileys & emotion',
+    emcat_people: 'People & body',
+    emcat_animals: 'Animals & nature',
+    emcat_food: 'Food & drink',
+    emcat_travel: 'Travel & places',
+    emcat_activities: 'Activities',
+    emcat_objects: 'Objects',
+    emcat_symbols: 'Symbols',
+    emcat_flags: 'Flags'
   },
   ar: {
     dir: 'rtl',
@@ -426,7 +504,46 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     tplimgright: 'صورة يمين، نص يسار',
     tplimgtop: 'صورة أعلى، نص أسفل',
     tplimgcenter: 'نص أعلى، صورة وسط',
-    deltemplate: 'حذف القالب'
+    deltemplate: 'حذف القالب',
+    video: 'فيديو',
+    quickvideo: 'إدراج فيديو',
+    deletevideo: 'حذف الفيديو',
+    uploadvideo: 'رفع من الجهاز',
+    videolink: 'إدراج من رابط',
+    videourlph: 'الصق رابط الفيديو…',
+    insertvideo: 'إدراج',
+    dropvideo: 'أسقط الفيديو هنا',
+    mathformula: 'إدراج معادلة رياضية',
+    mathdlgttl: 'إدراج معادلة رياضية',
+    mathderivation: 'اشتقاق متعدد الأسطر',
+    mathlatex: 'LaTeX',
+    editmath: 'تعديل المعادلة',
+    deletemath: 'حذف المعادلة',
+    videodlgttl: 'إدراج/تعديل فيديو',
+    vidgeneral: 'عام',
+    vidembed: 'تضمين',
+    vidadvanced: 'متقدم',
+    vidsource: 'المصدر',
+    vidembedhint: 'الصق كود التضمين أدناه:',
+    vidaltsource: 'رابط مصدر بديل',
+    vidposter: 'صورة الغلاف (رابط الصورة)',
+    emoji: 'رموز تعبيرية…',
+    chcat_currency: 'عملات',
+    chcat_text: 'نص وعلامات ترقيم',
+    chcat_math: 'رموز رياضية',
+    chcat_arrows: 'أسهم',
+    chcat_symbols: 'رموز',
+    chcat_latin: 'لاتينية موسعة',
+    chcat_arabic: 'عربية',
+    emcat_smileys: 'وجوه ومشاعر',
+    emcat_people: 'أشخاص وإيماءات',
+    emcat_animals: 'حيوانات وطبيعة',
+    emcat_food: 'طعام وشراب',
+    emcat_travel: 'سفر وأماكن',
+    emcat_activities: 'أنشطة',
+    emcat_objects: 'أشياء',
+    emcat_symbols: 'رموز',
+    emcat_flags: 'أعلام'
   }
 };
 

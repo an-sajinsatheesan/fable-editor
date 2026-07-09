@@ -110,7 +110,7 @@ describe('FableEditor core', () => {
     it('renders the default toolbar/menubar identically to the built-in layout (golden master)', () => {
       const editor = new FableEditor({ target: container });
       expect(container.querySelectorAll('.tbr .tgrp').length).toBe(16);
-      expect(container.querySelectorAll('.tbr .tgrp > *').length).toBe(42);
+      expect(container.querySelectorAll('.tbr .tgrp > *').length).toBe(45); // 44 original + emoji
       const menuKeys = Array.from(container.querySelectorAll('.mnb button')).map(
         (b) => (b as HTMLElement).dataset.menuKey
       );
@@ -125,6 +125,21 @@ describe('FableEditor core', () => {
       expect(groups[0].children.length).toBe(2);
       expect(groups[1].children.length).toBe(1);
       expect((groups[1].children[0] as HTMLElement).dataset.id).toBe('bold');
+      editor.destroy();
+    });
+
+    it('accepts TinyMCE-style toolbar strings via aliases (styles/image/media/table)', () => {
+      const editor = new FableEditor({
+        target: container,
+        toolbar:
+          'undo redo | styles | bold italic underline strikethrough | ' +
+          'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image'
+      });
+      const groups = container.querySelectorAll('.tbr .tgrp');
+      expect(groups.length).toBe(6);
+      // "styles" renders the blocks dropdown, "image" the quick-image button
+      expect((groups[1].children[0] as HTMLElement).dataset.id).toBe('blocksel');
+      expect(groups[5].children.length).toBe(2);
       editor.destroy();
     });
 

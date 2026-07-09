@@ -307,13 +307,13 @@
                word-break: break-word;
           }
 
-          .earea img {
+          .earea img, .earea video {
                max-width: 100%;
                height: auto;
           }
 
-          /* image upload placeholder */
-          .earea .img-ph {
+          /* image / video upload placeholder */
+          .earea .img-ph, .earea .vid-ph {
                display: flex;
                align-items: center;
                justify-content: center;
@@ -332,7 +332,7 @@
                user-select: none;
           }
 
-          .earea .img-ph svg {
+          .earea .img-ph svg, .earea .vid-ph svg {
                width: 20px;
                height: 20px;
                flex: none;
@@ -343,17 +343,17 @@
                stroke-linejoin: round;
           }
 
-          .earea .img-ph.active {
+          .earea .img-ph.active, .earea .vid-ph.active {
                outline: 2px solid #006ce7;
                outline-offset: 1px;
           }
 
-          .earea .img-ph.uploading {
+          .earea .img-ph.uploading, .earea .vid-ph.uploading {
                cursor: wait;
                opacity: 0.75;
           }
 
-          .earea .img-ph.uploading svg {
+          .earea .img-ph.uploading svg, .earea .vid-ph.uploading svg {
                animation: img-ph-spin 1s linear infinite;
                transform-origin: center;
           }
@@ -362,14 +362,51 @@
                to { transform: rotate(360deg); }
           }
 
-          .earea .img-ph.upload-error {
+          .earea .img-ph.upload-error, .earea .vid-ph.upload-error {
                border-color: #e03e2d;
                background: #fff5f5;
                color: #c92a2a;
           }
 
-          .earea .img-ph.upload-error svg {
+          .earea .img-ph.upload-error svg, .earea .vid-ph.upload-error svg {
                stroke: #c92a2a;
+          }
+
+          /* math / LaTeX formulas */
+          .earea .math-fable {
+               cursor: pointer;
+               border-radius: 4px;
+          }
+
+          .earea .math-fable-block {
+               display: block;
+               text-align: center;
+               margin: 0.5em 0;
+               padding: 4px;
+          }
+
+          .earea .math-fable.math-selected {
+               outline: 2px solid #006ce7;
+               outline-offset: 2px;
+          }
+
+          /* embedded hosted players (YouTube & co.) */
+          .earea .video-embed {
+               display: inline-block;
+               max-width: 100%;
+          }
+
+          .earea .video-embed iframe {
+               /* clicks land on the wrapper so the embed can be selected/deleted */
+               pointer-events: none;
+               display: block;
+               border: 0;
+               max-width: 100%;
+          }
+
+          .earea .video-embed.math-selected {
+               outline: 2px solid #006ce7;
+               outline-offset: 2px;
           }
 
           /* template blocks (image + heading/paragraph layouts) */
@@ -398,7 +435,13 @@
                max-width: 100%;
           }
 
-          .earea .tpl .img-ph {
+          .earea .tpl-media video,
+          .earea .tpl-media .video-embed {
+               max-width: 100%;
+          }
+
+          .earea .tpl .img-ph,
+          .earea .tpl .vid-ph {
                display: inline-flex;
                width: 300px;
                max-width: 100%;
@@ -421,7 +464,9 @@
           }
 
           .earea .tpl-img-left .img-ph,
-          .earea .tpl-img-right .img-ph {
+          .earea .tpl-img-right .img-ph,
+          .earea .tpl-img-left .vid-ph,
+          .earea .tpl-img-right .vid-ph {
                width: 260px;
           }
 
@@ -779,7 +824,68 @@
                transform: scale(1.12);
           }
 
-          /* char map */
+          /* char / emoji map: fixed category tabs left, glyph grid right */
+          .chmap {
+               display: flex;
+               width: 560px;
+               max-width: 76vw;
+               height: 320px;
+               max-height: 46vh;
+          }
+
+          .chmap .chtabs {
+               flex: 0 0 158px;
+               display: flex;
+               flex-direction: column;
+               gap: 2px;
+               overflow-y: auto;
+               padding: 6px 8px 6px 0;
+               border-inline-end: 1px solid #e3e8ee;
+          }
+
+          .chmap .chtabs button {
+               border: 0;
+               background: none;
+               text-align: start;
+               padding: 8px 10px;
+               border-radius: 6px;
+               font: 13.5px inherit;
+               color: #222f3e;
+               cursor: pointer;
+               white-space: nowrap;
+          }
+
+          .chmap .chtabs button:hover {
+               background: #f0f0f0;
+          }
+
+          .chmap .chtabs button.on {
+               background: #e8f1fb;
+               color: #0060ce;
+               font-weight: 600;
+          }
+
+          .chmap .chpanel {
+               flex: 1;
+               overflow-y: auto;
+               padding: 6px 0 6px 8px;
+          }
+
+          .chmap .chgrid {
+               grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+               padding: 0;
+          }
+
+          .chmap .chgrid.emgrid {
+               grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+          }
+
+          .chmap .chgrid.emgrid button {
+               width: 36px;
+               height: 36px;
+               font-size: 20px;
+          }
+
           .chgrid {
                display: grid;
                grid-template-columns: repeat(8, 30px);
@@ -920,6 +1026,84 @@
                resize: vertical;
           }
 
+          /* tabbed dialogs (insert/edit video) */
+          .dlg .dtabs {
+               display: flex;
+               gap: 2px;
+               border-bottom: 1px solid #e3e8ee;
+               margin-bottom: 14px;
+          }
+
+          .dlg .dtabs button {
+               border: 0;
+               background: none;
+               padding: 8px 14px;
+               font: 14px inherit;
+               color: #556;
+               cursor: pointer;
+               border-bottom: 2px solid transparent;
+               margin-bottom: -1px;
+          }
+
+          .dlg .dtabs button.on {
+               color: #006ce7;
+               border-bottom-color: #006ce7;
+               font-weight: 600;
+          }
+
+          .dlg .dtabbody {
+               width: 460px;
+               max-width: 76vw;
+               min-height: 150px;
+          }
+
+          .dlg .dtabpanel textarea {
+               width: 100%;
+               box-sizing: border-box;
+          }
+
+          .dlg .dfield {
+               display: flex;
+               flex-direction: column;
+               gap: 4px;
+               margin-bottom: 12px;
+               flex: 1;
+          }
+
+          .dlg .dfield label {
+               font-size: 13px;
+               color: #445;
+          }
+
+          .dlg .dfield input {
+               border: 1px solid #cfd6df;
+               border-radius: 6px;
+               padding: 8px 10px;
+               font: 14px inherit;
+               min-width: 0;
+          }
+
+          .dlg .drow {
+               display: flex;
+               gap: 10px;
+               align-items: flex-end;
+          }
+
+          .dlg button.txtbtn {
+               border: 1px solid #cfd6df;
+               background: #fff;
+               color: #222f3e;
+               border-radius: 6px;
+               padding: 8px 12px;
+               font: 13.5px inherit;
+               cursor: pointer;
+               white-space: nowrap;
+          }
+
+          .dlg button.txtbtn:hover {
+               background: #f0f4f9;
+          }
+
           .dlg table.kbd {
                border-collapse: collapse;
                width: 100%;
@@ -943,6 +1127,10 @@
                border: 1px solid #dde2e8;
           }
      </style>
+     <!-- Math formulas are rendered with KaTeX (https://katex.org). Required for the
+          "Insert math formula" toolbar/menu item — remove along with that feature if unused. -->
+     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 </head>
 
 <body>
@@ -971,6 +1159,8 @@
           </div>
      </div>
      <input type="file" id="imgInput" accept="image/jpeg,image/jpg,image/png,image/gif,image/bmp,image/webp"
+          style="display:none">
+     <input type="file" id="vidInput" accept="video/mp4,video/webm,video/ogg"
           style="display:none">
      <script src="fable-editor.js"></script>
 </body>

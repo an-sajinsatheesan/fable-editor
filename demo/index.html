@@ -64,6 +64,10 @@
 
   <script type="module">
     import { FableEditor } from '../src/core/index.ts';
+    // Math formulas render with KaTeX; the editor doesn't bundle its stylesheet
+    // (to avoid shipping KaTeX's webfonts in every install), so apps that use
+    // the "Insert math formula" feature import it once, same as here.
+    import 'katex/dist/katex.min.css';
 
     /* Sample imageUploadHandler: swap this out for real S3 / Azure Blob / server
        storage. It should PUT/POST the file to your backend (which then talks to

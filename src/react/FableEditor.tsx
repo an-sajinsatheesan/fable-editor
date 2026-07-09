@@ -16,6 +16,7 @@ export const FableEditor = forwardRef<FableEditorApi, FableEditorProps>(
     const editorRef = useRef<FableEditorCore | null>(null);
     const isInternalChange = useRef(false);
     const lastValue = useRef(value ?? defaultValue);
+    const pendingValue = useRef<string | null>(null);
     const onChangeRef = useRef(onChange);
     const onReadyRef = useRef(onReady);
 
@@ -63,9 +64,33 @@ export const FableEditor = forwardRef<FableEditorApi, FableEditorProps>(
         isInternalChange.current = false;
         return;
       }
+      /* setContent() replaces the editor's DOM wholesale and doesn't preserve
+         the caret — applying it while the user is mid-edit can strand the
+         selection in an unrelated node (e.g. a table cell). Defer external
+         value updates until the editor loses focus. */
+      if (containerRef.current?.contains(document.activeElement)) {
+        pendingValue.current = value;
+        return;
+      }
       lastValue.current = value;
       editorRef.current?.setContent(value);
     }, [value]);
+
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      const flushPendingValue = (e: FocusEvent) => {
+        if (pendingValue.current === null) return;
+        const next = e.relatedTarget as Node | null;
+        if (next && container.contains(next)) return; // focus moved within the editor (toolbar, dialog, ...)
+        const v = pendingValue.current;
+        pendingValue.current = null;
+        lastValue.current = v;
+        editorRef.current?.setContent(v);
+      };
+      container.addEventListener('focusout', flushPendingValue);
+      return () => container.removeEventListener('focusout', flushPendingValue);
+    }, []);
 
     useEffect(() => {
       if (initOptions.language) {

@@ -45,7 +45,21 @@ en:{ dir:'ltr',
   imageurlph:'Paste image URL…',insertimg:'Insert',dropimage:'Drop image here',
   uploading:'Uploading…',uploadfailed:'Upload failed — click to retry',deleteimg:'Delete image',
   template:'Templates',tplimgleft:'Image left, text right',tplimgright:'Image right, text left',
-  tplimgtop:'Image top, text below',tplimgcenter:'Text top, image center',deltemplate:'Delete template'
+  tplimgtop:'Image top, text below',tplimgcenter:'Text top, image center',deltemplate:'Delete template',
+  video:'Video',quickvideo:'Insert video',deletevideo:'Delete video',
+  uploadvideo:'Upload from computer',videolink:'Insert from URL',
+  videourlph:'Paste video URL…',insertvideo:'Insert',dropvideo:'Drop video here',
+  mathformula:'Insert math formula',mathdlgttl:'Insert Math Formula',
+  mathderivation:'Multi-line derivation',editmath:'Edit formula',deletemath:'Delete formula',
+  videodlgttl:'Insert/edit video',vidgeneral:'General',vidembed:'Embed',vidadvanced:'Advanced',
+  vidsource:'Source',vidembedhint:'Paste your embed code below:',
+  vidaltsource:'Alternative source URL',vidposter:'Media poster (Image URL)',
+  emoji:'Emojis…',
+  chcat_currency:'Currency',chcat_text:'Text & punctuation',chcat_math:'Mathematical',
+  chcat_arrows:'Arrows',chcat_symbols:'Symbols',chcat_latin:'Extended Latin',chcat_arabic:'Arabic',
+  emcat_smileys:'Smileys & emotion',emcat_people:'People & body',emcat_animals:'Animals & nature',
+  emcat_food:'Food & drink',emcat_travel:'Travel & places',emcat_activities:'Activities',
+  emcat_objects:'Objects',emcat_symbols:'Symbols',emcat_flags:'Flags'
 },
 ar:{ dir:'rtl',
   file:'ملف',edit:'تحرير',view:'عرض',insert:'إدراج',format:'التنسيق',
@@ -83,7 +97,21 @@ ar:{ dir:'rtl',
   imageurlph:'الصق رابط الصورة…',insertimg:'إدراج',dropimage:'أسقط الصورة هنا',
   uploading:'جارٍ الرفع…',uploadfailed:'فشل الرفع — انقر لإعادة المحاولة',deleteimg:'حذف الصورة',
   template:'قوالب',tplimgleft:'صورة يسار، نص يمين',tplimgright:'صورة يمين، نص يسار',
-  tplimgtop:'صورة أعلى، نص أسفل',tplimgcenter:'نص أعلى، صورة وسط',deltemplate:'حذف القالب'
+  tplimgtop:'صورة أعلى، نص أسفل',tplimgcenter:'نص أعلى، صورة وسط',deltemplate:'حذف القالب',
+  video:'فيديو',quickvideo:'إدراج فيديو',deletevideo:'حذف الفيديو',
+  uploadvideo:'رفع من الجهاز',videolink:'إدراج من رابط',
+  videourlph:'الصق رابط الفيديو…',insertvideo:'إدراج',dropvideo:'أسقط الفيديو هنا',
+  mathformula:'إدراج معادلة رياضية',mathdlgttl:'إدراج معادلة رياضية',
+  mathderivation:'اشتقاق متعدد الأسطر',editmath:'تعديل المعادلة',deletemath:'حذف المعادلة',
+  videodlgttl:'إدراج/تعديل فيديو',vidgeneral:'عام',vidembed:'تضمين',vidadvanced:'متقدم',
+  vidsource:'المصدر',vidembedhint:'الصق كود التضمين أدناه:',
+  vidaltsource:'رابط مصدر بديل',vidposter:'صورة الغلاف (رابط الصورة)',
+  emoji:'رموز تعبيرية…',
+  chcat_currency:'عملات',chcat_text:'نص وعلامات ترقيم',chcat_math:'رموز رياضية',
+  chcat_arrows:'أسهم',chcat_symbols:'رموز',chcat_latin:'لاتينية موسعة',chcat_arabic:'عربية',
+  emcat_smileys:'وجوه ومشاعر',emcat_people:'أشخاص وإيماءات',emcat_animals:'حيوانات وطبيعة',
+  emcat_food:'طعام وشراب',emcat_travel:'سفر وأماكن',emcat_activities:'أنشطة',
+  emcat_objects:'أشياء',emcat_symbols:'رموز',emcat_flags:'أعلام'
 }};
 let lang = 'en';
 const t = k => I18N[lang][k];
@@ -112,6 +140,29 @@ const COLORS = [
 const CHARS = ['©','®','™','§','¶','†','‡','•','…','′','″','‰','°','±','×','÷',
  '≈','≠','≤','≥','∞','µ','√','∑','€','£','¥','¢','←','→','↑','↓',
  '«','»','“','”','‘','’','–','—','؟','،','؛','٪','٭','ـ','٠','١'];
+
+/* special characters + emoji, grouped for the two-pane pickers
+   (category tabs left, glyph grid right); keys are i18n label keys */
+const CHAR_CATEGORIES = [
+ {key:'chcat_currency',chars:['€','£','¥','¢','$','₹','₽','₩','₺','₴','₦','฿','₫','₪','﷼','¤']},
+ {key:'chcat_text',chars:['§','¶','†','‡','•','…','′','″','‰','–','—','¡','¿','·','‹','›','«','»','“','”','‘','’','„','‚','¦','ª','º']},
+ {key:'chcat_math',chars:['°','±','×','÷','≈','≠','≤','≥','∞','µ','√','∑','∫','∂','∆','∏','π','Ω','α','β','γ','θ','λ','σ','φ','ω','∈','∉','∪','∩','⊂','⊃','∀','∃','∅','∝','∴','¬','½','⅓','¼','¾','⅔','⅛','⅜','⅝','⅞','¹','²','³']},
+ {key:'chcat_arrows',chars:['←','→','↑','↓','↔','↕','⇐','⇒','⇑','⇓','⇔','↖','↗','↘','↙','↩','↪','⤴','⤵']},
+ {key:'chcat_symbols',chars:['©','®','™','℠','№','℮','✓','✗','★','☆','✦','♠','♣','♥','♦','♪','♫','☀','☁','☂','☾','☹','☺','✉','✂','✎','☞','☜']},
+ {key:'chcat_latin',chars:['À','Á','Â','Ã','Ä','Å','Æ','Ç','È','É','Ê','Ë','Ì','Í','Î','Ï','Ñ','Ò','Ó','Ô','Õ','Ö','Ø','Ù','Ú','Û','Ü','Ý','ß','à','á','â','ã','ä','å','æ','ç','è','é','ê','ë','ì','í','î','ï','ñ','ò','ó','ô','õ','ö','ø','ù','ú','û','ü','ý','ÿ']},
+ {key:'chcat_arabic',chars:['؟','،','؛','٪','٭','ـ','٠','١','٢','٣','٤','٥','٦','٧','٨','٩','﴾','﴿','۞','؎']}
+];
+const EMOJI_CATEGORIES = [
+ {key:'emcat_smileys',chars:['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😋','😛','😜','🤪','🤨','🧐','🤓','😎','🥳','😏','😒','😞','😔','😟','😕','🙁','😣','😫','😩','🥺','😢','😭','😤','😠','😡','🤯','😳','🥵','🥶','😱','😨','😥','🤗','🤔','🤭','🤫','😐','😑','😬','🙄','😯','😴','😪','😷','🤒','🤕','🤢','🤧','😈','💀','👻','👽','🤖','💩','😺','😸','😹','😻','🙀']},
+ {key:'emcat_people',chars:['👋','🤚','✋','🖖','👌','🤏','✌','🤞','🤟','🤘','🤙','👈','👉','👆','👇','☝','👍','👎','✊','👊','👏','🙌','👐','🤲','🤝','🙏','💪','✍','💅','🤳','👂','👃','👀','👁','🧠','👶','🧒','👦','👧','🧑','👨','👩','🧓','👴','👵','👮','👷','💂','🕵','👸','🤴','👰','🤵','🤰','👼','🎅','🦸','🦹','🧙','🧚','🧛','🧟','💃','🕺','🚶','🏃','🧘']},
+ {key:'emcat_animals',chars:['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆','🦅','🦉','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐢','🐍','🦎','🦖','🐙','🦑','🦀','🐠','🐟','🐬','🐳','🦈','🐊','🐅','🦓','🦍','🐘','🦏','🐪','🦒','🦘','🐄','🐎','🐖','🐑','🐐','🦌','🐕','🐈','🐓','🦃','🦚','🦜','🦢','🕊','🐇','🦔','🌵','🌲','🌴','🌱','🌿','☘','🍀','🍁','🌸','🌺','🌻','🌹','🌷','💐']},
+ {key:'emcat_food',chars:['🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥒','🌶','🌽','🥕','🥔','🥐','🍞','🥖','🥨','🧀','🥚','🍳','🥞','🥓','🥩','🍗','🍖','🌭','🍔','🍟','🍕','🥪','🌮','🌯','🥗','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🍤','🍚','🍧','🍨','🍦','🥧','🧁','🍰','🎂','🍮','🍭','🍬','🍫','🍿','🍩','🍪','🥜','🍯','🥛','☕','🍵','🥤','🍺','🥂','🍷','🍸','🍹']},
+ {key:'emcat_travel',chars:['🚗','🚕','🚙','🚌','🏎','🚓','🚑','🚒','🚚','🚜','🛵','🏍','🚲','🛴','🚔','🚃','🚄','🚅','🚂','🚆','🚇','🚉','✈','🛫','🛬','💺','🚁','🚀','🛸','🚢','⛵','🚤','⚓','⛽','🚧','🗺','🗿','🗽','🗼','🏰','🏯','🎡','🎢','🎠','⛲','🏖','🏝','🌋','⛰','🏔','🗻','🏕','⛺','🏠','🏡','🏢','🏬','🏥','🏦','🏨','🏪','🏫','💒','⛪','🕌','🕍','🕋','⛩','🌅','🌄','🌇','🌆','🌃','🌉','🌌','🌠']},
+ {key:'emcat_activities',chars:['⚽','🏀','🏈','⚾','🎾','🏐','🏉','🎱','🏓','🏸','🏒','🏑','🏏','⛳','🏹','🎣','🥊','🥋','⛸','🎿','⛷','🏂','🏋','🤸','⛹','🤺','🏇','🧗','🏄','🏊','🚣','🚵','🚴','🏆','🥇','🥈','🥉','🏅','🎖','🎫','🎪','🤹','🎭','🎨','🎬','🎤','🎧','🎼','🎹','🥁','🎷','🎺','🎸','🎻','🎲','🎯','🎳','🎮','🎰','🧩']},
+ {key:'emcat_objects',chars:['⌚','📱','💻','⌨','🖥','🖨','🖱','🕹','💽','💾','💿','📀','📷','📸','📹','🎥','📞','☎','📺','📻','🎙','⏱','⏰','⌛','⏳','📡','🔋','🔌','💡','🔦','🕯','💸','💵','💰','💳','💎','⚖','🔧','🔨','⚒','🛠','⛏','🔩','⚙','🧲','🔫','💣','🔪','🛡','🔮','🧿','🔭','🔬','💊','💉','🌡','🧬','🧪','🧹','🧺','🛁','🔑','🗝','🚪','🛋','🛏','🧸','🖼','🛍','🛒','🎁','🎈','🎀','🎊','🎉','✉','📩','📦','📜','📄','📊','📈','📉','📅','📋','📁','📰','📓','📚','📖','🔖','🔗','📎','📐','📏','📌','📍','✂','🖊','✒','🖌','🖍','📝','✏','🔍','🔒','🔓']},
+ {key:'emcat_symbols',chars:['❤','🧡','💛','💚','💙','💜','🖤','💔','❣','💕','💞','💓','💗','💖','💘','💝','☮','✝','☪','🕉','☸','✡','☯','♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓','⚛','❌','⭕','🛑','⛔','🚫','💯','💢','⚠','🚸','🔱','⚜','🔰','♻','✅','❇','✳','❎','🌐','💠','🌀','💤','🏧','♿','🚭','❗','❕','❓','❔','‼','⁉','💲','🔅','🔆','〽','ℹ','🆗','🆕','🆓','🆒','🆙','🈯','🈚']},
+ {key:'emcat_flags',chars:['🏁','🚩','🎌','🏴','🏳','🇦🇪','🇸🇦','🇶🇦','🇰🇼','🇧🇭','🇴🇲','🇪🇬','🇯🇴','🇱🇧','🇮🇳','🇵🇰','🇺🇸','🇬🇧','🇨🇦','🇦🇺','🇫🇷','🇩🇪','🇮🇹','🇪🇸','🇵🇹','🇳🇱','🇧🇪','🇨🇭','🇸🇪','🇳🇴','🇩🇰','🇫🇮','🇮🇪','🇬🇷','🇹🇷','🇷🇺','🇺🇦','🇵🇱','🇯🇵','🇰🇷','🇨🇳','🇸🇬','🇲🇾','🇮🇩','🇹🇭','🇵🇭','🇻🇳','🇧🇷','🇦🇷','🇲🇽','🇿🇦','🇳🇬','🇰🇪','🇲🇦']}
+];
 
 /* ---------------------------------------------------------- icons */
 const S = (inner,vb) => `<svg viewBox="${vb||'0 0 24 24'}">${inner}</svg>`;
@@ -163,7 +214,11 @@ const IC = {
  tplleft:S('<rect x="3" y="5" width="8" height="8" rx=".8"/><path d="M13.5 6.5H21M13.5 9.5H21M13.5 12.5H21M3 15.5h18M3 18.5h18"/>'),
  tplright:S('<rect x="13" y="5" width="8" height="8" rx=".8"/><path d="M3 6.5h7.5M3 9.5h7.5M3 12.5h7.5M3 15.5h18M3 18.5h18"/>'),
  tpltop:S('<rect x="5" y="3" width="14" height="9" rx=".8"/><path d="M3 15h18M3 18h18M3 21h12"/>'),
- tplcenter:S('<path d="M3 4h18M3 7h18M3 10h12"/><rect x="5" y="12.5" width="14" height="9" rx=".8"/>')
+ tplcenter:S('<path d="M3 4h18M3 7h18M3 10h12"/><rect x="5" y="12.5" width="14" height="9" rx=".8"/>'),
+ video:S('<rect x="3" y="6" width="13" height="12" rx="1.5"/><path d="M17 10l4-2.5v9L17 14z"/>'),
+ mathic:S('<text x="3" y="18" font-size="17" stroke="none" fill="#222f3e" font-family="Georgia" font-style="italic">&#8721;</text>'),
+ editic:S('<path d="M4 20l1-4.5L15.5 5 19 8.5 8.5 19 4 20z"/><path d="M13.5 6.5l4 4"/>'),
+ emojiic:S('<circle cx="12" cy="12" r="8.5"/><path d="M8.6 14.3a4.6 4.6 0 0 0 6.8 0"/><path d="M9.2 9.6v.7M14.8 9.6v.7"/>')
 };
 const TXT = (html)=>`<span class="txt">${html}</span>`;
 
@@ -175,6 +230,7 @@ const ed      = document.getElementById('earea');
 const sbHelp  = document.getElementById('sbHelp');
 const sbWords = document.getElementById('sbWords');
 const imgInput= document.getElementById('imgInput');
+const vidInput= document.getElementById('vidInput');
 
 let savedRange = null;
 let foreColor = '#000000', backColor = '#FACC15';
@@ -434,8 +490,12 @@ function buildToolbar(){
       const btn = ev.currentTarget; saveSel();
       popup(btn, el=>menuItems(el,[
         {label:t('quickimage'),icon:IC.image,action:insertImagePlaceholder},
+        {label:t('quickvideo'),icon:IC.video,action:()=>videoDlg()},
         {label:t('quicktable'),icon:IC.tableic,action:()=>tableGrid(btn)},
-        {label:t('template'),icon:IC.templateic,action:()=>templateMenu(btn)}
+        {label:t('mathformula'),icon:IC.mathic,action:()=>mathDlg()},
+        {label:t('template'),icon:IC.templateic,action:()=>templateMenu(btn)},
+        {label:t('charmap'),icon:IC.charic,action:()=>charMap()},
+        {label:t('emoji'),icon:IC.emojiic,action:()=>emojiMap()}
       ]));
     }) )
   );
@@ -463,10 +523,13 @@ function buildMenubar(){
            mItem('preview',IC.prevw,previewDlg),
            mItem('sourcecode',IC.srcic,sourceDlg) ],
     insert:[ mItem('image',IC.image,insertImagePlaceholder),
+           mItem('video',IC.video,()=>videoDlg()),
+           mItem('mathformula',IC.mathic,()=>mathDlg()),
            {label:t('inserttable'),icon:IC.tableic,action:()=>tableGrid(menubar.children[6]||menubar)},
            {label:t('template'),icon:IC.templateic,action:()=>templateMenu(menubar.children[3]||menubar)},
            mItem('hr',IC.hric,()=>exec('insertHorizontalRule')), '|',
            mItem('charmap',IC.charic,a=>charMap()),
+           mItem('emoji',IC.emojiic,()=>emojiMap()),
            mItem('datetime',IC.dateic,()=>exec('insertText',
                new Date().toLocaleString(lang==='ar'?'ar-AE':'en-GB'))), '|',
            mItem('pagebreak',IC.pbic,()=>{restoreSel();
@@ -663,14 +726,38 @@ function previewDlg(){
     box.innerHTML = ed.innerHTML; body.appendChild(box);
   });
 }
-function charMap(){
-  dialog(t('charmap').replace('…',''), body=>{
-    const g=document.createElement('div'); g.className='chgrid';
-    CHARS.forEach(ch=>{ const b=document.createElement('button'); b.textContent=ch;
-      b.onclick=()=>{ closeDlg(); exec('insertText',ch); }; g.appendChild(b); });
-    body.appendChild(g);
+/* two-pane picker shared by the special-character map and the emoji map:
+   fixed category tabs on the left, the active category's glyphs on the right */
+function glyphPickerDlg(title, cats, emoji){
+  saveSel();
+  dialog(title, body=>{
+    const wrap=document.createElement('div'); wrap.className='chmap';
+    const tabs=document.createElement('div'); tabs.className='chtabs';
+    const panel=document.createElement('div'); panel.className='chpanel';
+    const grid=document.createElement('div'); grid.className='chgrid'+(emoji?' emgrid':'');
+    panel.appendChild(grid);
+    const show=i=>{
+      [...tabs.querySelectorAll('button')].forEach((b,bi)=>b.classList.toggle('on', bi===i));
+      grid.innerHTML='';
+      cats[i].chars.forEach(ch=>{
+        const b=document.createElement('button'); b.type='button'; b.textContent=ch;
+        b.onclick=()=>{ closeDlg(); exec('insertText',ch); };
+        grid.appendChild(b);
+      });
+      panel.scrollTop=0;
+    };
+    cats.forEach((c,i)=>{
+      const b=document.createElement('button'); b.type='button'; b.textContent=t(c.key);
+      b.addEventListener('click', ()=>show(i));
+      tabs.appendChild(b);
+    });
+    wrap.append(tabs, panel);
+    body.appendChild(wrap);
+    show(0);
   });
 }
+function charMap(){ glyphPickerDlg(t('charmap').replace('…',''), CHAR_CATEGORIES, false); }
+function emojiMap(){ glyphPickerDlg(t('emoji').replace('…',''), EMOJI_CATEGORIES, true); }
 function printDoc(){
   const w=window.open('','_blank');
   w.document.write(`<html dir="${t('dir')}"><body style="font-family:Helvetica,Arial,sans-serif;font-size:14px">${ed.innerHTML}</body></html>`);
@@ -731,10 +818,12 @@ function renderPhCtxButtons(){
   phCtx.innerHTML='';
   phCtx.append(
     ctxBtn(IC.uploadic, t('uploadimg'), ()=>{ phUploadTarget=phActive; pickImage(); }),
-    ctxBtn(IC.linkic, t('imagelink'), renderPhCtxUrlInput),
-    ctxSep(),
-    ctxBtn(IC.trash, t('deleteimg'), removeImgPlaceholder)
+    ctxBtn(IC.linkic, t('imagelink'), renderPhCtxUrlInput)
   );
+  /* a template's media slot is image-first, but can host a video instead */
+  if(phActive && phActive.closest('.tpl-media'))
+    phCtx.append(ctxBtn(IC.video, t('quickvideo'), ()=>swapPlaceholderKind('video')));
+  phCtx.append(ctxSep(), ctxBtn(IC.trash, t('deleteimg'), removeImgPlaceholder));
   positionImgPhCtx();
 }
 function renderPhCtxUrlInput(){
@@ -841,6 +930,526 @@ ed.addEventListener('drop', e=>{
   const file=[...(e.dataTransfer?.files||[])].find(f=>f.type.startsWith('image/'));
   if(file) readImageFileInto(file, ph);
 });
+
+/* ---------------------------------------------- video upload placeholder */
+function pickVideo(){ vidInput.value=''; vidInput.click(); }
+vidInput.addEventListener('change', ()=>{
+  const file = vidInput.files[0]; if(!file) return;
+  const vph = vphUploadTarget; vphUploadTarget=null;
+  if(vph && ed.contains(vph)){ readVideoFileInto(file, vph); return; }
+  const fr=new FileReader();
+  fr.onload=()=>{ restoreSel();
+    document.execCommand('insertHTML',false,
+      `<video controls src="${fr.result}" title="${file.name.replace(/"/g,'')}"></video>`);
+    onChange(); };
+  fr.readAsDataURL(file);
+});
+
+let vphActive=null, vphCtx=null, vphUploadTarget=null;
+function clearVphPlaceholderSel(){
+  vphCtx?.remove(); vphCtx=null;
+  vphActive?.classList.remove('active'); vphActive=null;
+}
+function vidPhHTML(id){
+  return `<div class="vid-ph"${id?` id="${id}"`:''} contenteditable="false">${IC.video}<span>${t('dropvideo')}</span></div>`;
+}
+function removeVphPlaceholder(){
+  const ph=vphActive;
+  if(!ph) return;
+  clearVphPlaceholderSel();
+  /* like the image variant: a placeholder inside a template block IS the
+     media slot — deleting it drops the slot, leaving a text-only block */
+  (ph.closest('.tpl-media') || ph).remove();
+  refreshState(); onChange();
+}
+/* swaps a template slot's placeholder between image and video kinds */
+function swapPlaceholderKind(to){
+  const ph = to==='video' ? phActive : vphActive;
+  if(!ph) return;
+  const tmp=document.createElement('div');
+  tmp.innerHTML = to==='video' ? vidPhHTML() : imgPhHTML();
+  const next=tmp.firstElementChild;
+  if(to==='video') clearImgPlaceholderSel(); else clearVphPlaceholderSel();
+  ph.replaceWith(next);
+  if(to==='video') selectVphPlaceholder(next); else selectImgPlaceholder(next);
+  onChange();
+}
+function insertVideoPlaceholder(){
+  restoreSel();
+  const id='vid-ph-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  document.execCommand('insertHTML',false,vidPhHTML(id));
+  const ph=ed.querySelector('#'+id);
+  if(ph){ ph.removeAttribute('id'); selectVphPlaceholder(ph); }
+  onChange();
+}
+function selectVphPlaceholder(ph){
+  if(vphActive===ph) return;
+  clearVphPlaceholderSel();
+  vphActive=ph; ph.classList.add('active');
+  vphCtx=document.createElement('div');
+  vphCtx.className='tblctx img-ph-ctx'; vphCtx.dir=t('dir');
+  document.body.appendChild(vphCtx);
+  renderVphCtxButtons();
+}
+function renderVphCtxButtons(){
+  if(!vphCtx) return;
+  vphCtx.innerHTML='';
+  vphCtx.append(
+    ctxBtn(IC.uploadic, t('uploadvideo'), ()=>{ vphUploadTarget=vphActive; pickVideo(); }),
+    ctxBtn(IC.linkic, t('videolink'), renderVphCtxUrlInput)
+  );
+  /* inside a template slot, offer switching the slot back to an image */
+  if(vphActive && vphActive.closest('.tpl-media'))
+    vphCtx.append(ctxBtn(IC.image, t('quickimage'), ()=>swapPlaceholderKind('image')));
+  vphCtx.append(ctxSep(), ctxBtn(IC.trash, t('deletevideo'), removeVphPlaceholder));
+  positionVphCtx();
+}
+function renderVphCtxUrlInput(){
+  if(!vphCtx) return;
+  vphCtx.innerHTML='';
+  const inp=document.createElement('input');
+  inp.type='url'; inp.className='urlinp'; inp.placeholder=t('videourlph');
+  const ok=document.createElement('button');
+  ok.type='button'; ok.className='txtbtn'; ok.textContent=t('insertvideo');
+  const submit=()=>{
+    const url=inp.value.trim(), ph=vphActive;
+    if(!ph) return;
+    if(!/^(https?:|data:video\/|blob:)/i.test(url)){ inp.classList.add('err'); inp.focus(); return; }
+    /* a page URL from a known video host can't play in a <video> tag —
+       swap in the host's iframe player instead of probing it */
+    const embed=videoEmbedUrl(url);
+    if(embed){ replacePlaceholderWithEmbed(ph, embed); return; }
+    ok.disabled=true; inp.disabled=true;
+    /* only place the video once its metadata actually loads, so the user
+       gets a working preview instead of a broken player */
+    const probe=document.createElement('video');
+    probe.preload='metadata';
+    probe.onloadedmetadata=()=>replacePlaceholderWithVideo(ph,url,'');
+    probe.onerror=()=>{ ok.disabled=false; inp.disabled=false;
+      inp.classList.add('err'); inp.focus(); };
+    probe.src=url;
+  };
+  ok.addEventListener('click', submit);
+  inp.addEventListener('input', ()=>inp.classList.remove('err'));
+  inp.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); submit(); }
+    else if(e.key==='Escape'){ e.stopPropagation(); renderVphCtxButtons(); }
+  });
+  vphCtx.append(inp, ok);
+  positionVphCtx();
+  inp.focus();
+}
+function readVideoFileInto(file, ph){
+  if(ph.classList.contains('uploading')) return;
+  /* set window.fableEditorVideoUploadHandler = file => Promise<url> to route
+     picked/dropped videos to S3 / Azure Blob / your own server instead of
+     inlining base64. */
+  if(typeof window.fableEditorVideoUploadHandler === 'function'){
+    uploadVideoFile(file, ph, window.fableEditorVideoUploadHandler);
+    return;
+  }
+  const fr=new FileReader();
+  fr.onload=()=>{ if(ed.contains(ph))
+    replacePlaceholderWithVideo(ph, fr.result, file.name.replace(/"/g,'')); };
+  fr.readAsDataURL(file);
+}
+function uploadVideoFile(file, ph, handler){
+  const title = file.name.replace(/"/g,'');
+  ph.classList.remove('upload-error');
+  ph.classList.add('uploading');
+  const span = ph.querySelector('span');
+  if(span) span.textContent = t('uploading');
+  Promise.resolve().then(()=>handler(file))
+    .then(url=>{ if(!ed.contains(ph)) return; replacePlaceholderWithVideo(ph, url, title); })
+    .catch(err=>{
+      if(!ed.contains(ph)) return;
+      ph.classList.remove('uploading');
+      ph.classList.add('upload-error');
+      if(span) span.textContent = t('uploadfailed');
+      console.error('video upload failed', err);
+    });
+}
+function replacePlaceholderWithVideo(ph, src, title){
+  const vid=document.createElement('video');
+  vid.controls=true; vid.src=src; if(title) vid.title=title;
+  ph.replaceWith(vid);
+  if(vphActive===ph) clearVphPlaceholderSel();
+  refreshState(); onChange();
+}
+function positionVphCtx(){
+  if(vphActive && !document.body.contains(vphActive)){ clearVphPlaceholderSel(); return; }
+  if(!vphActive || !vphCtx) return;
+  const r=vphActive.getBoundingClientRect();
+  const cw=vphCtx.offsetWidth, ch=vphCtx.offsetHeight;
+  let cx=r.left+scrollX+(r.width-cw)/2;
+  cx=Math.max(8+scrollX, Math.min(cx, scrollX+innerWidth-cw-8));
+  let cy=r.bottom+scrollY+8;
+  if(r.bottom+8+ch>innerHeight-4) cy=Math.max(scrollY+4, r.top+scrollY-ch-8);
+  vphCtx.style.left=cx+'px';
+  vphCtx.style.top=cy+'px';
+}
+ed.addEventListener('mousedown', e=>{
+  const ph = e.target.closest && e.target.closest('.vid-ph');
+  if(ph && ed.contains(ph)){ e.preventDefault(); ed.focus(); selectVphPlaceholder(ph); }
+  else clearVphPlaceholderSel();
+});
+ed.addEventListener('keydown', e=>{
+  if((e.key==='Delete'||e.key==='Backspace') && vphActive){ e.preventDefault(); removeVphPlaceholder(); }
+});
+document.addEventListener('mousedown', e=>{
+  if(!vphActive) return;
+  if(ed.contains(e.target) || (vphCtx && vphCtx.contains(e.target))) return;
+  clearVphPlaceholderSel();
+});
+ed.addEventListener('scroll', positionVphCtx);
+window.addEventListener('scroll', positionVphCtx, true);
+window.addEventListener('resize', positionVphCtx);
+ed.addEventListener('input', positionVphCtx);
+/* a video file dropped onto the placeholder is consumed; every other drop
+   stays blocked by the powerpaste_block_drop handler below */
+ed.addEventListener('drop', e=>{
+  const ph = e.target.closest && e.target.closest('.vid-ph');
+  if(!ph || !ed.contains(ph)) return;
+  const file=[...(e.dataTransfer?.files||[])].find(f=>f.type.startsWith('video/'));
+  if(file) readVideoFileInto(file, ph);
+});
+
+/* ---------------------------------------------------------- video dialog / embeds */
+/* maps a page URL from a known video host to its iframe player URL;
+   null for anything else (e.g. direct .mp4 file URLs) */
+function videoEmbedUrl(url){
+  let m=url.match(/^https?:\/\/(?:www\.|m\.)?youtube\.com\/watch\?(?:[^\s#]*[?&])?v=([\w-]{5,})/i);
+  if(!m) m=url.match(/^https?:\/\/(?:www\.)?(?:youtu\.be|youtube\.com\/(?:embed|shorts|live))\/([\w-]{5,})/i);
+  if(m) return 'https://www.youtube.com/embed/'+m[1];
+  m=url.match(/^https?:\/\/(?:www\.)?vimeo\.com\/(\d+)/i);
+  if(m) return 'https://player.vimeo.com/video/'+m[1];
+  m=url.match(/^https?:\/\/(?:www\.)?dailymotion\.com\/video\/(\w+)/i);
+  if(m) return 'https://www.dailymotion.com/embed/video/'+m[1];
+  return null;
+}
+function videoEmbedHTML(src, w, h){
+  return `<span class="video-embed" contenteditable="false"><iframe src="${src}" width="${w||560}" height="${h||314}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></span>`;
+}
+function replacePlaceholderWithEmbed(ph, embedUrl){
+  const tmp=document.createElement('div');
+  tmp.innerHTML=videoEmbedHTML(embedUrl);
+  ph.replaceWith(tmp.firstElementChild);
+  if(vphActive===ph) clearVphPlaceholderSel();
+  refreshState(); onChange();
+}
+/* insert/edit-video dialog: General (source/width/height), Embed (embed code),
+   Advanced (alternative source, poster image) */
+function videoDlg(){
+  saveSel();
+  let srcInp, wInp, hInp, embedTa, altInp, posterInp;
+  const field=(labelKey, input)=>{
+    const f=document.createElement('div'); f.className='dfield';
+    const l=document.createElement('label'); l.textContent=t(labelKey);
+    f.append(l, input); return f;
+  };
+  const urlInput=()=>{ const i=document.createElement('input'); i.type='url'; return i; };
+  dialog(t('videodlgttl'), body=>{
+    const tabs=document.createElement('div'); tabs.className='dtabs';
+    const panels=[];
+    const show=i=>{
+      [...tabs.querySelectorAll('button')].forEach((x,xi)=>x.classList.toggle('on', xi===i));
+      panels.forEach((x,xi)=>x.style.display = xi===i ? '' : 'none');
+    };
+    const mkTab=(labelKey, build)=>{
+      const b=document.createElement('button'); b.type='button'; b.textContent=t(labelKey);
+      const p=document.createElement('div'); p.className='dtabpanel';
+      build(p);
+      const i=panels.length; panels.push(p);
+      b.addEventListener('click', ()=>show(i));
+      tabs.appendChild(b);
+    };
+    mkTab('vidgeneral', p=>{
+      srcInp=urlInput(); srcInp.placeholder=t('videourlph'); srcInp.style.flex='1';
+      const srcRow=document.createElement('div'); srcRow.className='drow';
+      const upBtn=document.createElement('button');
+      upBtn.type='button'; upBtn.className='txtbtn'; upBtn.textContent=t('uploadvideo');
+      const file=document.createElement('input');
+      file.type='file'; file.accept='video/mp4,video/webm,video/ogg'; file.style.display='none';
+      upBtn.addEventListener('click', ()=>{ file.value=''; file.click(); });
+      file.addEventListener('change', ()=>{
+        const f=file.files[0]; if(!f) return;
+        upBtn.disabled=true; upBtn.textContent=t('uploading');
+        const done=url=>{ srcInp.value=url; upBtn.disabled=false; upBtn.textContent=t('uploadvideo'); };
+        if(typeof window.fableEditorVideoUploadHandler==='function'){
+          Promise.resolve().then(()=>window.fableEditorVideoUploadHandler(f))
+            .then(done)
+            .catch(err=>{ upBtn.disabled=false; upBtn.textContent=t('uploadfailed');
+              console.error('video upload failed', err); });
+        }else{
+          const fr=new FileReader();
+          fr.onload=()=>done(fr.result);
+          fr.readAsDataURL(f);
+        }
+      });
+      srcRow.append(srcInp, upBtn, file);
+      p.appendChild(field('vidsource', srcRow));
+      const dims=document.createElement('div'); dims.className='drow';
+      wInp=document.createElement('input'); wInp.type='number'; wInp.value='560';
+      hInp=document.createElement('input'); hInp.type='number'; hInp.value='314';
+      dims.append(field('tblwidth', wInp), field('tblheight', hInp));
+      p.appendChild(dims);
+    });
+    mkTab('vidembed', p=>{
+      const hint=document.createElement('p');
+      hint.textContent=t('vidembedhint');
+      hint.style.cssText='margin:0 0 8px;color:#556;font-size:13.5px';
+      embedTa=document.createElement('textarea');
+      embedTa.style.cssText='width:100%;box-sizing:border-box;height:160px';
+      p.append(hint, embedTa);
+    });
+    mkTab('vidadvanced', p=>{
+      altInp=urlInput(); posterInp=urlInput();
+      p.append(field('vidaltsource', altInp), field('vidposter', posterInp));
+    });
+    const wrap=document.createElement('div'); wrap.className='dtabbody';
+    panels.forEach(p=>wrap.appendChild(p));
+    body.append(tabs, wrap);
+    show(0);
+    setTimeout(()=>srcInp.focus(), 0);
+  },[
+    {label:t('cancel'),action:closeDlg},
+    {label:t('save'),pri:true,action:()=>{
+      const embedCode=embedTa.value.trim();
+      const src=srcInp.value.trim();
+      const w=parseInt(wInp.value,10)||560, h=parseInt(hInp.value,10)||314;
+      closeDlg();
+      if(!embedCode && !src) return;
+      restoreSel();
+      if(embedCode){
+        document.execCommand('insertHTML',false,
+          `<span class="video-embed" contenteditable="false">${embedCode}</span>`);
+        onChange(); return;
+      }
+      const embed=videoEmbedUrl(src);
+      if(embed){
+        document.execCommand('insertHTML',false,videoEmbedHTML(embed,w,h));
+      }else{
+        const alt=altInp.value.trim(), poster=posterInp.value.trim();
+        document.execCommand('insertHTML',false,
+          `<video controls width="${w}" height="${h}"${poster?` poster="${escapeAttr(poster)}"`:''}>`+
+          `<source src="${escapeAttr(src)}">${alt?`<source src="${escapeAttr(alt)}">`:''}</video>`);
+      }
+      onChange();
+    }}
+  ]);
+}
+/* selecting an embedded player shows a small delete toolbar (clicks can't
+   reach the iframe itself — CSS gives the wrapper the pointer events) */
+let embedActive=null, embedCtx=null;
+function clearEmbedSel(){
+  embedCtx?.remove(); embedCtx=null;
+  embedActive?.classList.remove('math-selected'); embedActive=null;
+}
+function selectEmbedEl(el){
+  if(embedActive===el) return;
+  clearEmbedSel();
+  embedActive=el; el.classList.add('math-selected');
+  embedCtx=document.createElement('div');
+  embedCtx.className='tblctx img-ph-ctx'; embedCtx.dir=t('dir');
+  embedCtx.append(ctxBtn(IC.trash, t('deletevideo'), ()=>{ el.remove(); clearEmbedSel(); onChange(); }));
+  document.body.appendChild(embedCtx);
+  positionEmbedCtx();
+}
+function positionEmbedCtx(){
+  if(!embedActive || !document.body.contains(embedActive)){ clearEmbedSel(); return; }
+  if(!embedCtx) return;
+  const r=embedActive.getBoundingClientRect();
+  const cw=embedCtx.offsetWidth, ch=embedCtx.offsetHeight;
+  let cx=r.left+scrollX+(r.width-cw)/2;
+  cx=Math.max(8+scrollX, Math.min(cx, scrollX+innerWidth-cw-8));
+  let cy=r.top+scrollY-ch-8;
+  if(cy<scrollY+4) cy=r.bottom+scrollY+8;
+  embedCtx.style.left=cx+'px';
+  embedCtx.style.top=cy+'px';
+}
+ed.addEventListener('mousedown', e=>{
+  const el = e.target.closest && e.target.closest('.video-embed');
+  if(el && ed.contains(el)){ e.preventDefault(); selectEmbedEl(el); }
+  else clearEmbedSel();
+});
+document.addEventListener('mousedown', e=>{
+  if(!embedActive) return;
+  if(ed.contains(e.target) || (embedCtx && embedCtx.contains(e.target))) return;
+  clearEmbedSel();
+});
+ed.addEventListener('scroll', positionEmbedCtx);
+window.addEventListener('scroll', positionEmbedCtx, true);
+window.addEventListener('resize', positionEmbedCtx);
+ed.addEventListener('input', positionEmbedCtx);
+
+/* ---------------------------------------------------------- math / LaTeX formulas */
+function escapeAttr(s){ return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+function unescapeAttr(s){ return s.replace(/&quot;/g,'"').replace(/&amp;/g,'&'); }
+function renderMathHTML(latex, block){
+  try{ return katex.renderToString(latex, {throwOnError:false, displayMode:block, strict:'ignore'}); }
+  catch(e){ return ''; }
+}
+/* shared by the math dialog, math paste and math typing: renders `src` and
+   inserts it at the caret as the standard math element */
+function insertMathElement(src, block){
+  const latex = block ? `\\begin{aligned}${src}\\end{aligned}` : src;
+  const rendered = renderMathHTML(latex, block);
+  const tag = block ? 'div' : 'span';
+  document.execCommand('insertHTML', false,
+    `<${tag} class="math-fable${block?' math-fable-block':''}" contenteditable="false" data-latex="${escapeAttr(src)}">${rendered}</${tag}>`);
+}
+/* recognizes a plain-text clipboard payload that is entirely one math formula:
+   $$…$$ / \[…\] (block), \(…\) (inline), a \begin{…}…\end{…} environment (block),
+   or $…$ (inline — only when the inside looks like LaTeX, so "$50" stays text) */
+function mathFromClipboard(text){
+  const t=text.trim();
+  if(!t) return null;
+  const block = t.match(/^\$\$([\s\S]+)\$\$$/) || t.match(/^\\\[([\s\S]+)\\\]$/);
+  if(block){
+    const src=block[1].trim();
+    if(!src || src.includes('$')) return null;
+    return {latex:joinDerivationLines(src), block:true};
+  }
+  if(/^\\begin\{[a-zA-Z*]+\}[\s\S]+\\end\{[a-zA-Z*]+\}$/.test(t))
+    return {latex:joinDerivationLines(t), block:true};
+  const inline = t.match(/^\\\(([\s\S]+)\\\)$/) || t.match(/^\$([^$\n]+)\$$/);
+  if(inline){
+    const src=inline[1].trim();
+    if(!src || src.includes('$')) return null;
+    if(t.startsWith('$') && !/[\\^_{}=]/.test(src)) return null;
+    return {latex:src, block:false};
+  }
+  return null;
+}
+/* a derivation pasted as separate lines has no explicit \\ row breaks — add them */
+function joinDerivationLines(src){
+  if(!/\n/.test(src)) return src;
+  if(/\\\\/.test(src) || /\\begin\{/.test(src)) return src.replace(/\s*\n\s*/g,' ');
+  return src.split(/\n+/).map(l=>l.trim()).filter(Boolean).join(' \\\\ ');
+}
+/* typing "$…$" converts to an inline formula the moment the closing "$" is
+   typed; only kicks in when the run parses as valid LaTeX-ish syntax */
+function tryMathTyping(e){
+  const sel=window.getSelection();
+  if(!sel || !sel.isCollapsed || !sel.anchorNode) return;
+  const node=sel.anchorNode;
+  if(node.nodeType!==3 || !ed.contains(node)) return;
+  if(node.parentElement && node.parentElement.closest('.math-fable, pre, code')) return;
+  const before=(node.textContent||'').slice(0, sel.anchorOffset);
+  const m=before.match(/(?:^|[^\\$])\$([^$]+)$/);
+  if(!m) return;
+  const src=m[1];
+  if(/^\s|\s$/.test(src) || !/[\\^_{}=]/.test(src)) return;
+  const rendered=renderMathHTML(src, false);
+  if(!rendered || rendered.includes('katex-error')) return;
+  e.preventDefault();
+  const range=document.createRange();
+  range.setStart(node, sel.anchorOffset - src.length - 1);
+  range.setEnd(node, sel.anchorOffset);
+  sel.removeAllRanges(); sel.addRange(range);
+  insertMathElement(src, false);
+  onChange();
+}
+ed.addEventListener('keydown', e=>{
+  if(e.key==='$' && !e.ctrlKey && !e.metaKey && !e.altKey) tryMathTyping(e);
+});
+function mathDlg(existing){
+  saveSel();
+  const isBlock = existing ? existing.classList.contains('math-fable-block') : false;
+  const initialLatex = existing && existing.dataset.latex ? unescapeAttr(existing.dataset.latex) : '';
+  let ta, derivChk, preview;
+  const updatePreview=()=>{
+    const src=ta.value||'', block=derivChk.checked;
+    const latex=block?`\\begin{aligned}${src}\\end{aligned}`:src;
+    preview.innerHTML = renderMathHTML(latex, block);
+  };
+  dialog(t('mathdlgttl'), body=>{
+    ta=document.createElement('textarea'); ta.value=initialLatex;
+    ta.placeholder='e.g. x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}';
+    ta.style.cssText='width:360px;max-width:100%;min-height:80px;font-family:monospace;font-size:13px';
+    const chkRow=document.createElement('label');
+    chkRow.style.cssText='display:flex;align-items:center;gap:6px;margin:8px 0;font-size:13.5px;color:#445';
+    derivChk=document.createElement('input'); derivChk.type='checkbox'; derivChk.checked=isBlock;
+    chkRow.append(derivChk, document.createTextNode(t('mathderivation')));
+    preview=document.createElement('div'); preview.className='math-preview';
+    preview.style.cssText='min-height:40px;margin-top:8px;padding:10px;border:1px solid #e1e5ea;border-radius:6px;overflow:auto';
+    ta.addEventListener('input', updatePreview);
+    derivChk.addEventListener('change', updatePreview);
+    body.append(ta, chkRow, preview);
+    setTimeout(()=>{ ta.focus(); updatePreview(); }, 0);
+  },[
+    {label:t('cancel'),action:closeDlg},
+    {label:t('save'),pri:true,action:()=>{
+      const src=ta.value.trim();
+      closeDlg();
+      if(!src) return;
+      const block=derivChk.checked;
+      const latex=block?`\\begin{aligned}${src}\\end{aligned}`:src;
+      const rendered=renderMathHTML(latex, block);
+      const dataLatex=escapeAttr(src);
+      if(existing){
+        existing.className = block?'math-fable math-fable-block':'math-fable';
+        existing.dataset.latex = dataLatex;
+        existing.innerHTML = rendered;
+        clearMathSel(); onChange();
+        return;
+      }
+      restoreSel();
+      const tag = block?'div':'span';
+      document.execCommand('insertHTML', false,
+        `<${tag} class="math-fable${block?' math-fable-block':''}" contenteditable="false" data-latex="${dataLatex}">${rendered}</${tag}>`);
+      onChange();
+    }}
+  ]);
+}
+let mathActive=null, mathCtx=null;
+function clearMathSel(){
+  mathCtx?.remove(); mathCtx=null;
+  mathActive?.classList.remove('math-selected'); mathActive=null;
+}
+function selectMathEl(el){
+  if(mathActive===el) return;
+  clearMathSel();
+  mathActive=el; el.classList.add('math-selected');
+  mathCtx=buildMathCtxToolbar(el);
+  positionMathCtx();
+}
+function buildMathCtxToolbar(el){
+  const ctx=document.createElement('div'); ctx.className='tblctx img-ph-ctx'; ctx.dir=t('dir');
+  ctx.append(
+    ctxBtn(IC.editic, t('editmath'), ()=>mathDlg(el)),
+    ctxSep(),
+    ctxBtn(IC.trash, t('deletemath'), ()=>{ el.remove(); clearMathSel(); onChange(); })
+  );
+  document.body.appendChild(ctx);
+  return ctx;
+}
+function positionMathCtx(){
+  if(!mathActive || !document.body.contains(mathActive)){ clearMathSel(); return; }
+  const r=mathActive.getBoundingClientRect();
+  if(!mathCtx) return;
+  const cw=mathCtx.offsetWidth, ch=mathCtx.offsetHeight;
+  let cx=r.left+scrollX+(r.width-cw)/2;
+  cx=Math.max(8+scrollX, Math.min(cx, scrollX+innerWidth-cw-8));
+  let cy=r.top+scrollY-ch-8;
+  if(cy<scrollY+4) cy=r.bottom+scrollY+8;
+  mathCtx.style.left=cx+'px';
+  mathCtx.style.top=cy+'px';
+}
+ed.addEventListener('mousedown', e=>{
+  const el = e.target.closest && e.target.closest('.math-fable');
+  if(el && ed.contains(el)){ e.preventDefault(); selectMathEl(el); }
+  else clearMathSel();
+});
+document.addEventListener('mousedown', e=>{
+  if(!mathActive) return;
+  if(ed.contains(e.target) || (mathCtx && mathCtx.contains(e.target))) return;
+  clearMathSel();
+});
+ed.addEventListener('scroll', positionMathCtx);
+window.addEventListener('scroll', positionMathCtx, true);
+window.addEventListener('resize', positionMathCtx);
+ed.addEventListener('input', positionMathCtx);
 
 /* ---------------------------------------------------------- templates */
 const TPL_LAYOUTS=['img-left','img-right','img-top','img-center'];
@@ -1550,6 +2159,18 @@ ed.addEventListener('paste', e=>{
       `<img src="${fr.result}" alt="">`); onChange(); };
     fr.readAsDataURL(imgItem.getAsFile());
     return;
+  }
+  if(!html){
+    /* plain-text pastes get two additive pre-checks before the normal text
+       pipeline runs (the paste engine itself is untouched): a clipboard that
+       is entirely one LaTeX formula/derivation becomes a rendered math
+       element, and a bare video page URL (YouTube & co.) becomes an
+       embedded player; anything else falls through unchanged */
+    const raw=cd.getData('text/plain');
+    const math=mathFromClipboard(raw);
+    if(math){ insertMathElement(math.latex, math.block); onChange(); return; }
+    const embed=/^\S+$/.test(raw.trim()) ? videoEmbedUrl(raw.trim()) : null;
+    if(embed){ document.execCommand('insertHTML',false,videoEmbedHTML(embed)); onChange(); return; }
   }
   if(html){
     document.execCommand('insertHTML',false,cleanPastedHTML(html));
