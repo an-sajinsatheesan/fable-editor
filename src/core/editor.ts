@@ -1,9 +1,10 @@
 import { EditorInitOptions, EditorLanguage, FableEditorApi, MenuItemDef, DialogButton } from './types';
 import { getStrings, I18nStrings } from './i18n';
-import { FONTS, SIZES, BLOCKS, COLORS, QUICK_COLORS, CHARS, MIN_FONT_PX, MAX_FONT_PX, LINE_HEIGHTS, WORD_SPACINGS, DEFAULT_TOOLBAR, DEFAULT_MENUBAR } from './config';
+import { FONTS, SIZES, BLOCKS, COLORS, QUICK_COLORS, CHAR_CATEGORIES, EMOJI_CATEGORIES, GlyphCategory, MIN_FONT_PX, MAX_FONT_PX, LINE_HEIGHTS, WORD_SPACINGS, DEFAULT_TOOLBAR, DEFAULT_MENUBAR } from './config';
 import { IC } from './icons';
 import { cleanPastedHTML, normalizeTextPaste } from './paste-engine';
 import { importDocxToHtml } from './docx-import';
+import katex from 'katex';
 
 type ImgCorner = 'nw' | 'ne' | 'sw' | 'se';
 const IMG_CORNERS: ImgCorner[] = ['nw', 'ne', 'sw', 'se'];
@@ -26,7 +27,12 @@ const TPL_ICON: Record<TplLayout, string> = {
 export class FableEditor implements FableEditorApi {
     private static instanceCounter = 0;
 
-    private options: Required<Omit<EditorInitOptions, 'imageUploadHandler' | 'onImageUploadError' | 'contentStyle'>>;
+    private options: Required<
+        Omit<
+            EditorInitOptions,
+            'imageUploadHandler' | 'onImageUploadError' | 'contentStyle' | 'videoUploadHandler' | 'onVideoUploadError'
+        >
+    >;
     private lang: EditorLanguage = 'en';
     private contentClass = 'fable-content-' + FableEditor.instanceCounter++;
     private contentStyleEl: HTMLStyleElement | null = null;
@@ -69,6 +75,21 @@ export class FableEditor implements FableEditorApi {
     private onImageUploadError?: (error: unknown, file: File) => void;
     private contentStyle?: string;
 
+    private vidInput!: HTMLInputElement;
+    /* a <video> element or a .video-embed iframe wrapper — both share the
+       same selection outline + align/delete context toolbar */
+    private vidActive: HTMLElement | null = null;
+    private vidCtx: HTMLElement | null = null;
+    private vidHideTimer: number | null = null;
+    private vphActive: HTMLElement | null = null;
+    private vphCtx: HTMLElement | null = null;
+    private vphUploadTarget: HTMLElement | null = null;
+    private videoUploadHandler?: (file: File) => Promise<string>;
+    private onVideoUploadError?: (error: unknown, file: File) => void;
+
+    private mathActive: HTMLElement | null = null;
+    private mathCtx: HTMLElement | null = null;
+
     private selCtx: HTMLElement | null = null;
 
     private tplActive: HTMLElement | null = null;
@@ -97,10 +118,13 @@ export class FableEditor implements FableEditorApi {
             readonly: options.readonly ?? false,
             draftKey: options.draftKey ?? (typeof location !== 'undefined' ? location.pathname : 'default'),
             fontFamilyFormats: options.fontFamilyFormats ?? FONTS,
-            imageFileTypes: options.imageFileTypes ?? ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp']
+            imageFileTypes: options.imageFileTypes ?? ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'],
+            videoFileTypes: options.videoFileTypes ?? ['video/mp4', 'video/webm', 'video/ogg']
         };
         this.imageUploadHandler = options.imageUploadHandler;
         this.onImageUploadError = options.onImageUploadError;
+        this.videoUploadHandler = options.videoUploadHandler;
+        this.onVideoUploadError = options.onVideoUploadError;
         this.contentStyle = options.contentStyle;
         this.lang = this.options.language;
         this.draftStorageKey = 'tmclone-draft:' + this.options.draftKey;
@@ -179,6 +203,12 @@ export class FableEditor implements FableEditorApi {
         this.imgInput.style.display = 'none';
         target.appendChild(this.imgInput);
 
+        this.vidInput = document.createElement('input');
+        this.vidInput.type = 'file';
+        this.vidInput.accept = this.options.videoFileTypes.join(',');
+        this.vidInput.style.display = 'none';
+        target.appendChild(this.vidInput);
+
         this.docInput = document.createElement('input');
         this.docInput.type = 'file';
         this.docInput.accept = '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -252,6 +282,9 @@ export class FableEditor implements FableEditorApi {
             this.positionImageHandles();
             this.positionImgPhCtx();
             this.positionTplCtx();
+            this.positionVphCtx();
+            this.positionVidCtx();
+            this.positionMathCtx();
         });
         this.on(this.ed, 'keydown', (e: KeyboardEvent) => {
             if (e.altKey && e.key === '0') {
@@ -262,16 +295,29 @@ export class FableEditor implements FableEditorApi {
                 e.preventDefault();
                 this.removeImgPlaceholder();
             }
+            if ((e.key === 'Delete' || e.key === 'Backspace') && this.vphActive) {
+                e.preventDefault();
+                this.removeVphPlaceholder();
+            }
+            if (e.key === '$' && !e.ctrlKey && !e.metaKey && !e.altKey) this.tryMathTyping(e);
         });
         this.on(this.ed, 'paste', (e: ClipboardEvent) => this.handlePaste(e));
         this.on(this.ed, 'drop', (e: DragEvent) => {
             /* content drops stay blocked (powerpaste_block_drop) — only an
-               image file dropped onto an upload placeholder is consumed */
+               image/video file dropped onto its matching upload placeholder is consumed */
             e.preventDefault();
-            const ph = (e.target as HTMLElement).closest?.('.img-ph') as HTMLElement | null;
-            if (!ph || !this.ed.contains(ph) || this.options.readonly) return;
-            const file = Array.from(e.dataTransfer?.files || []).find((f) => f.type.startsWith('image/'));
-            if (file) this.readImageFileInto(file, ph);
+            const target = e.target as HTMLElement;
+            const ph = target.closest?.('.img-ph:not(.vid-ph)') as HTMLElement | null;
+            if (ph && this.ed.contains(ph) && !this.options.readonly) {
+                const file = Array.from(e.dataTransfer?.files || []).find((f) => f.type.startsWith('image/'));
+                if (file) this.readImageFileInto(file, ph);
+                return;
+            }
+            const vph = target.closest?.('.vid-ph') as HTMLElement | null;
+            if (vph && this.ed.contains(vph) && !this.options.readonly) {
+                const file = Array.from(e.dataTransfer?.files || []).find((f) => f.type.startsWith('video/'));
+                if (file) this.readVideoFileInto(file, vph);
+            }
         });
         this.on(this.ed, 'dragover', (e: DragEvent) => e.preventDefault());
         this.on(this.ed, 'mousedown', (e: MouseEvent) => {
@@ -279,13 +325,21 @@ export class FableEditor implements FableEditorApi {
             const table = target.closest?.('table');
             if (table && this.ed.contains(table)) this.selectTableForResize(table as HTMLTableElement);
             else this.clearTableHandles();
-            const ph = target.closest?.('.img-ph') as HTMLElement | null;
+            const ph = target.closest?.('.img-ph:not(.vid-ph)') as HTMLElement | null;
             if (ph && this.ed.contains(ph) && !this.options.readonly) {
                 e.preventDefault();
                 this.ed.focus();
                 this.selectImgPlaceholder(ph);
             } else {
                 this.clearImgPlaceholderSel();
+            }
+            const vph = target.closest?.('.vid-ph') as HTMLElement | null;
+            if (vph && this.ed.contains(vph) && !this.options.readonly) {
+                e.preventDefault();
+                this.ed.focus();
+                this.selectVphPlaceholder(vph);
+            } else {
+                this.clearVphPlaceholderSel();
             }
             const tpl = target.closest?.('.tpl') as HTMLElement | null;
             if (tpl && this.ed.contains(tpl) && !this.options.readonly) this.selectTemplate(tpl);
@@ -296,6 +350,20 @@ export class FableEditor implements FableEditorApi {
                 this.selectImage(img);
             } else {
                 this.clearImageHandles();
+            }
+            const vid = target.closest?.('video, .video-embed') as HTMLElement | null;
+            if (vid && this.ed.contains(vid) && !this.options.readonly) {
+                e.preventDefault();
+                this.selectVideo(vid);
+            } else {
+                this.clearVidHandles();
+            }
+            const mathEl = target.closest?.('.math-fable') as HTMLElement | null;
+            if (mathEl && this.ed.contains(mathEl) && !this.options.readonly) {
+                e.preventDefault();
+                this.selectMathEl(mathEl);
+            } else {
+                this.clearMathSel();
             }
         });
         this.on(this.ed, 'mouseover', (e: MouseEvent) => {
@@ -324,6 +392,9 @@ export class FableEditor implements FableEditorApi {
             this.positionImageHandles();
             this.positionImgPhCtx();
             this.positionTplCtx();
+            this.positionVphCtx();
+            this.positionVidCtx();
+            this.positionMathCtx();
         });
         this.onWin(
             'scroll',
@@ -332,6 +403,9 @@ export class FableEditor implements FableEditorApi {
                 this.positionImageHandles();
                 this.positionImgPhCtx();
                 this.positionTplCtx();
+                this.positionVphCtx();
+                this.positionVidCtx();
+                this.positionMathCtx();
                 this.repositionSelToolbar();
             },
             true
@@ -341,6 +415,9 @@ export class FableEditor implements FableEditorApi {
             this.positionImageHandles();
             this.positionImgPhCtx();
             this.positionTplCtx();
+            this.positionVphCtx();
+            this.positionVidCtx();
+            this.positionMathCtx();
             this.repositionSelToolbar();
         });
 
@@ -366,6 +443,28 @@ export class FableEditor implements FableEditorApi {
             fr.readAsDataURL(file);
         });
 
+        this.on(this.vidInput, 'change', () => {
+            const file = this.vidInput.files?.[0];
+            if (!file) return;
+            const vph = this.vphUploadTarget;
+            this.vphUploadTarget = null;
+            if (vph && this.ed.contains(vph)) {
+                this.readVideoFileInto(file, vph);
+                return;
+            }
+            const fr = new FileReader();
+            fr.onload = () => {
+                this.restoreSel();
+                document.execCommand(
+                    'insertHTML',
+                    false,
+                    `<video controls src="${fr.result}" title="${file.name.replace(/"/g, '')}"></video>`
+                );
+                this.onChange();
+            };
+            fr.readAsDataURL(file);
+        });
+
         this.on(this.docInput, 'change', () => {
             const file = this.docInput.files?.[0];
             if (!file) return;
@@ -383,6 +482,9 @@ export class FableEditor implements FableEditorApi {
                 (this.phCtx && this.phCtx.contains(e.target as Node)) ||
                 (this.tplCtx && this.tplCtx.contains(e.target as Node)) ||
                 (this.selCtx && this.selCtx.contains(e.target as Node)) ||
+                (this.vphCtx && this.vphCtx.contains(e.target as Node)) ||
+                (this.vidCtx && this.vidCtx.contains(e.target as Node)) ||
+                (this.mathCtx && this.mathCtx.contains(e.target as Node)) ||
                 (this.openPop && this.openPop.contains(e.target as Node)) ||
                 (this.openSubEl && this.openSubEl.contains(e.target as Node))
             )
@@ -391,6 +493,9 @@ export class FableEditor implements FableEditorApi {
             this.clearImageHandles();
             this.clearImgPlaceholderSel();
             this.clearTplSel();
+            this.clearVphPlaceholderSel();
+            this.clearVidHandles();
+            this.clearMathSel();
             this.clearSelToolbar();
         });
     }
@@ -430,6 +535,9 @@ export class FableEditor implements FableEditorApi {
         this.clearImageHandles();
         this.clearImgPlaceholderSel();
         this.clearTplSel();
+        this.clearVphPlaceholderSel();
+        this.clearVidHandles();
+        this.clearMathSel();
         this.clearSelToolbar();
         this.onChange();
     }
@@ -492,11 +600,15 @@ export class FableEditor implements FableEditorApi {
         this.clearImageHandles();
         this.clearImgPlaceholderSel();
         this.clearTplSel();
+        this.clearVphPlaceholderSel();
+        this.clearVidHandles();
+        this.clearMathSel();
         this.clearSelToolbar();
         this.listeners.forEach((fn) => fn());
         this.listeners = [];
         if (this.shell && this.shell.parentNode) this.shell.parentNode.removeChild(this.shell);
         if (this.imgInput && this.imgInput.parentNode) this.imgInput.parentNode.removeChild(this.imgInput);
+        if (this.vidInput && this.vidInput.parentNode) this.vidInput.parentNode.removeChild(this.vidInput);
         if (this.docInput && this.docInput.parentNode) this.docInput.parentNode.removeChild(this.docInput);
         this.contentStyleEl = null;
     }
@@ -1320,7 +1432,7 @@ export class FableEditor implements FableEditorApi {
      *  (the quick color chips); everything else yields one. */
     private buildToolbarRegistry(): Record<string, () => HTMLElement | HTMLElement[]> {
         const tableBtn = this.tbtn(IC.tableic, this.t('quicktable'), () => this.tableGrid(tableBtn));
-        return {
+        const registry: Record<string, () => HTMLElement | HTMLElement[]> = {
             undo: () => this.tbtn(IC.undo, this.t('undo'), () => this.exec('undo')),
             redo: () => this.tbtn(IC.redo, this.t('redo'), () => this.exec('redo')),
             preview: () => this.tbtn(IC.prevw, this.t('preview'), () => this.previewDlg()),
@@ -1360,12 +1472,22 @@ export class FableEditor implements FableEditorApi {
             ltr: () => this.tbtn(IC.ltr, this.t('ltr'), () => this.setDir('ltr'), 'ltr'),
             rtl: () => this.tbtn(IC.rtl, this.t('rtl'), () => this.setDir('rtl'), 'rtl'),
             quickimage: () => this.tbtn(IC.image, this.t('quickimage'), () => this.insertImagePlaceholder()),
+            quickvideo: () => this.tbtn(IC.video, this.t('quickvideo'), () => this.videoDlg()),
+            mathformula: () => this.tbtn(IC.mathic, this.t('mathformula'), () => this.mathDlg()),
             quicktable: () => tableBtn,
             template: () => this.menuTbtn(IC.templateic, this.t('template'), (b) => this.templateMenu(b)),
             charmap: () => this.tbtn(IC.charic, this.t('charmap'), () => this.charMap()),
+            emoji: () => this.tbtn(IC.emojiic, this.t('emoji'), () => this.emojiMap()),
             fullscreen: () => this.tbtn(IC.fullscreen, this.t('fullscreen'), () => this.toggleFullscreen(), 'fullscreen'),
             sourcecode: () => this.tbtn(IC.srcic, this.t('sourcecode'), () => this.sourceDlg())
         };
+        /* TinyMCE-compatible aliases so common TinyMCE toolbar strings
+           (e.g. "undo redo | styles | ... | link image media") work as-is */
+        registry.styles = registry.blocks;
+        registry.image = registry.quickimage;
+        registry.media = registry.quickvideo;
+        registry.table = registry.quicktable;
+        return registry;
     }
 
     private buildToolbar(): void {
@@ -1431,11 +1553,14 @@ export class FableEditor implements FableEditorApi {
             insert: [
                 this.mItem('link', IC.link, () => this.linkDlg()),
                 this.mItem('image', IC.image, () => this.insertImagePlaceholder()),
+                this.mItem('video', IC.video, () => this.videoDlg()),
+                this.mItem('mathformula', IC.mathic, () => this.mathDlg()),
                 { label: this.t('inserttable'), icon: IC.tableic, action: () => this.tableGrid((this.menubar.querySelector('[data-menu-key="table"]') as HTMLElement) || this.menubar) },
                 { label: this.t('template'), icon: IC.templateic, subBuild: (el) => this.buildTemplatePickInto(el) },
                 this.mItem('hr', IC.hric, () => this.exec('insertHorizontalRule')),
                 '|',
                 this.mItem('charmap', IC.charic, () => this.charMap()),
+                this.mItem('emoji', IC.emojiic, () => this.emojiMap()),
                 this.mItem('datetime', IC.dateic, () =>
                     this.exec('insertText', new Date().toLocaleString(this.lang === 'ar' ? 'ar-AE' : 'en-GB'))
                 ),
@@ -2035,24 +2160,54 @@ export class FableEditor implements FableEditorApi {
         });
     }
 
-    private charMap(): void {
-        this.dialog(
-            this.t('charmap').replace('…', ''),
-            (body) => {
-                const g = document.createElement('div');
-                g.className = 'chgrid';
-                CHARS.forEach((ch) => {
+    /** Two-pane picker shared by the special-character map and the emoji map:
+     *  fixed category tabs on the left, the active category's glyphs on the right. */
+    private glyphPickerDlg(title: string, cats: GlyphCategory[], emoji: boolean): void {
+        this.saveSel();
+        this.dialog(title, (body) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'chmap';
+            const tabs = document.createElement('div');
+            tabs.className = 'chtabs';
+            const panel = document.createElement('div');
+            panel.className = 'chpanel';
+            const grid = document.createElement('div');
+            grid.className = 'chgrid' + (emoji ? ' emgrid' : '');
+            panel.appendChild(grid);
+            const show = (i: number) => {
+                tabs.querySelectorAll('button').forEach((b, bi) => b.classList.toggle('on', bi === i));
+                grid.innerHTML = '';
+                cats[i].chars.forEach((ch) => {
                     const b = document.createElement('button');
+                    b.type = 'button';
                     b.textContent = ch;
                     b.onclick = () => {
                         this.closeDlg();
                         this.exec('insertText', ch);
                     };
-                    g.appendChild(b);
+                    grid.appendChild(b);
                 });
-                body.appendChild(g);
-            }
-        );
+                panel.scrollTop = 0;
+            };
+            cats.forEach((c, i) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = this.t(c.key as keyof I18nStrings);
+                b.addEventListener('click', () => show(i));
+                tabs.appendChild(b);
+            });
+            wrap.append(tabs, panel);
+            body.appendChild(wrap);
+            show(0);
+        });
+    }
+
+    private charMap(): void {
+        this.glyphPickerDlg(this.t('charmap').replace('…', ''), CHAR_CATEGORIES, false);
+    }
+
+    private emojiMap(): void {
+        this.glyphPickerDlg(this.t('emoji').replace('…', ''), EMOJI_CATEGORIES, true);
     }
 
     private printDoc(): void {
@@ -2127,11 +2282,30 @@ export class FableEditor implements FableEditorApi {
                 this.phUploadTarget = this.phActive;
                 this.pickImage();
             }),
-            this.ctxBtn(IC.link, this.t('imagelink'), () => this.renderPhCtxUrlInput()),
-            this.ctxSep(),
-            this.ctxBtn(IC.trash, this.t('deleteimg'), () => this.removeImgPlaceholder())
+            this.ctxBtn(IC.link, this.t('imagelink'), () => this.renderPhCtxUrlInput())
         );
+        /* a template's media slot is image-first, but can host a video instead */
+        if (this.phActive?.closest('.tpl-media')) {
+            el.append(this.ctxBtn(IC.video, this.t('quickvideo'), () => this.swapPlaceholderKind('video')));
+        }
+        el.append(this.ctxSep(), this.ctxBtn(IC.trash, this.t('deleteimg'), () => this.removeImgPlaceholder()));
         this.positionImgPhCtx();
+    }
+
+    /** Swaps a template slot's placeholder between image and video kinds, so the
+     *  same media slot can be filled with either. */
+    private swapPlaceholderKind(to: 'image' | 'video'): void {
+        const ph = to === 'video' ? this.phActive : this.vphActive;
+        if (!ph) return;
+        const tmp = document.createElement('div');
+        tmp.innerHTML = to === 'video' ? this.vidPhHTML() : this.imgPhHTML();
+        const next = tmp.firstElementChild as HTMLElement;
+        if (to === 'video') this.clearImgPlaceholderSel();
+        else this.clearVphPlaceholderSel();
+        ph.replaceWith(next);
+        if (to === 'video') this.selectVphPlaceholder(next);
+        else this.selectImgPlaceholder(next);
+        this.onChange();
     }
 
     private renderPhCtxUrlInput(): void {
@@ -2246,6 +2420,712 @@ export class FableEditor implements FableEditorApi {
         if (r.bottom + 8 + ch > innerHeight - 4) cy = Math.max(this.ctxMinTop(), r.top + scrollY - ch - 8);
         this.phCtx.style.left = cx + 'px';
         this.phCtx.style.top = cy + 'px';
+    }
+
+    /* ---------------------------------------------------------- video upload placeholder */
+    private pickVideo(): void {
+        this.vidInput.value = '';
+        this.vidInput.click();
+    }
+
+    private vidPhHTML(id?: string): string {
+        return `<div class="img-ph vid-ph"${id ? ` id="${id}"` : ''} contenteditable="false">${IC.video}<span>${this.t('dropvideo')}</span></div>`;
+    }
+
+    private insertVideoPlaceholder(): void {
+        this.restoreSel();
+        const id = 'vid-ph-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        document.execCommand('insertHTML', false, this.vidPhHTML(id));
+        const ph = this.ed.querySelector('#' + id) as HTMLElement | null;
+        if (ph) {
+            ph.removeAttribute('id');
+            this.selectVphPlaceholder(ph);
+        }
+        this.onChange();
+    }
+
+    private clearVphPlaceholderSel(): void {
+        this.vphCtx?.remove();
+        this.vphCtx = null;
+        this.vphActive?.classList.remove('active');
+        this.vphActive = null;
+    }
+
+    private removeVphPlaceholder(): void {
+        const ph = this.vphActive;
+        if (!ph) return;
+        this.clearVphPlaceholderSel();
+        /* like the image variant: a placeholder inside a template block IS the
+           media slot — deleting it drops the slot, leaving a text-only block */
+        (ph.closest('.tpl-media') || ph).remove();
+        this.refreshState();
+        this.onChange();
+    }
+
+    private selectVphPlaceholder(ph: HTMLElement): void {
+        if (this.vphActive === ph) return;
+        this.clearVphPlaceholderSel();
+        this.vphActive = ph;
+        ph.classList.add('active');
+        this.vphCtx = document.createElement('div');
+        this.vphCtx.className = 'imgctx img-ph-ctx';
+        this.vphCtx.dir = this.dir();
+        document.body.appendChild(this.vphCtx);
+        this.renderVphCtxButtons();
+    }
+
+    private renderVphCtxButtons(): void {
+        const el = this.vphCtx;
+        if (!el) return;
+        el.innerHTML = '';
+        el.append(
+            this.ctxBtn(IC.uploadic, this.t('uploadvideo'), () => {
+                this.vphUploadTarget = this.vphActive;
+                this.pickVideo();
+            }),
+            this.ctxBtn(IC.link, this.t('videolink'), () => this.renderVphCtxUrlInput())
+        );
+        /* inside a template slot, offer switching the slot back to an image */
+        if (this.vphActive?.closest('.tpl-media')) {
+            el.append(this.ctxBtn(IC.image, this.t('quickimage'), () => this.swapPlaceholderKind('image')));
+        }
+        el.append(this.ctxSep(), this.ctxBtn(IC.trash, this.t('deletevideo'), () => this.removeVphPlaceholder()));
+        this.positionVphCtx();
+    }
+
+    private renderVphCtxUrlInput(): void {
+        const el = this.vphCtx;
+        if (!el) return;
+        el.innerHTML = '';
+        const inp = document.createElement('input');
+        inp.type = 'url';
+        inp.className = 'urlinp';
+        inp.placeholder = this.t('videourlph');
+        const ok = document.createElement('button');
+        ok.type = 'button';
+        ok.className = 'txtbtn';
+        ok.textContent = this.t('insertvideo');
+        const submit = () => {
+            const url = inp.value.trim();
+            const ph = this.vphActive;
+            if (!ph) return;
+            if (!/^(https?:|data:video\/|blob:)/i.test(url)) {
+                inp.classList.add('err');
+                inp.focus();
+                return;
+            }
+            /* a page URL from a known video host can't play in a <video> tag —
+               swap in the host's iframe player instead of probing it */
+            const embed = this.videoEmbedUrl(url);
+            if (embed) {
+                this.replacePlaceholderWithEmbed(ph, embed);
+                return;
+            }
+            ok.disabled = true;
+            inp.disabled = true;
+            /* only place the video once its metadata actually loads, so the user
+               gets a working preview instead of a broken player */
+            const probe = document.createElement('video');
+            probe.preload = 'metadata';
+            probe.onloadedmetadata = () => this.replacePlaceholderWithVideo(ph, url, '');
+            probe.onerror = () => {
+                ok.disabled = false;
+                inp.disabled = false;
+                inp.classList.add('err');
+                inp.focus();
+            };
+            probe.src = url;
+        };
+        ok.addEventListener('click', submit);
+        inp.addEventListener('input', () => inp.classList.remove('err'));
+        inp.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submit();
+            } else if (e.key === 'Escape') {
+                e.stopPropagation();
+                this.renderVphCtxButtons();
+            }
+        });
+        el.append(inp, ok);
+        this.positionVphCtx();
+        inp.focus();
+    }
+
+    private readVideoFileInto(file: File, ph: HTMLElement): void {
+        if (ph.classList.contains('uploading')) return;
+        if (this.videoUploadHandler) {
+            this.uploadVideoFile(file, ph);
+            return;
+        }
+        const fr = new FileReader();
+        fr.onload = () => {
+            if (this.ed.contains(ph)) this.replacePlaceholderWithVideo(ph, fr.result as string, file.name.replace(/"/g, ''));
+        };
+        fr.readAsDataURL(file);
+    }
+
+    /** Runs the host-supplied videoUploadHandler instead of inlining base64,
+     *  so apps can route the file to S3 / Azure Blob / their own server. */
+    private uploadVideoFile(file: File, ph: HTMLElement): void {
+        const title = file.name.replace(/"/g, '');
+        ph.classList.remove('upload-error');
+        ph.classList.add('uploading');
+        const span = ph.querySelector('span');
+        if (span) span.textContent = this.t('uploading');
+        this.videoUploadHandler!(file)
+            .then((url) => {
+                if (!this.ed.contains(ph)) return;
+                this.replacePlaceholderWithVideo(ph, url, title);
+            })
+            .catch((err) => {
+                if (!this.ed.contains(ph)) return;
+                ph.classList.remove('uploading');
+                ph.classList.add('upload-error');
+                if (span) span.textContent = this.t('uploadfailed');
+                this.onVideoUploadError?.(err, file);
+            });
+    }
+
+    private replacePlaceholderWithVideo(ph: HTMLElement, src: string, title: string): void {
+        const vid = document.createElement('video');
+        vid.controls = true;
+        vid.src = src;
+        if (title) vid.title = title;
+        ph.replaceWith(vid);
+        if (this.vphActive === ph) this.clearVphPlaceholderSel();
+        this.refreshState();
+        this.onChange();
+    }
+
+    /** Swaps a video placeholder for a hosted player iframe (YouTube & co.). */
+    private replacePlaceholderWithEmbed(ph: HTMLElement, embedUrl: string): void {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = this.videoEmbedHTML(embedUrl);
+        ph.replaceWith(tmp.firstElementChild as HTMLElement);
+        if (this.vphActive === ph) this.clearVphPlaceholderSel();
+        this.refreshState();
+        this.onChange();
+    }
+
+    private positionVphCtx(): void {
+        if (this.vphActive && !document.body.contains(this.vphActive)) {
+            this.clearVphPlaceholderSel();
+            return;
+        }
+        if (!this.vphActive || !this.vphCtx) return;
+        const r = this.vphActive.getBoundingClientRect();
+        const cw = this.vphCtx.offsetWidth;
+        const ch = this.vphCtx.offsetHeight;
+        let cx = r.left + scrollX + (r.width - cw) / 2;
+        cx = Math.max(8 + scrollX, Math.min(cx, scrollX + innerWidth - cw - 8));
+        let cy = r.bottom + scrollY + 8;
+        if (r.bottom + 8 + ch > innerHeight - 4) cy = Math.max(this.ctxMinTop(), r.top + scrollY - ch - 8);
+        this.vphCtx.style.left = cx + 'px';
+        this.vphCtx.style.top = cy + 'px';
+    }
+
+    /* ---------------------------------------------------------- video toolbar (post-insert) */
+    private cancelVidHide(): void {
+        if (this.vidHideTimer != null) {
+            window.clearTimeout(this.vidHideTimer);
+            this.vidHideTimer = null;
+        }
+    }
+
+    private clearVidHandles(): void {
+        this.cancelVidHide();
+        this.vidCtx?.remove();
+        this.vidCtx = null;
+        this.vidActive?.classList.remove('vid-selected');
+        this.vidActive = null;
+    }
+
+    private selectVideo(vid: HTMLElement): void {
+        if (this.vidActive === vid) return;
+        this.clearVidHandles();
+        this.vidActive = vid;
+        vid.classList.add('vid-selected');
+        this.vidCtx = this.buildVideoCtxToolbar(vid);
+        this.positionVidCtx();
+    }
+
+    private buildVideoCtxToolbar(vid: HTMLElement): HTMLElement {
+        const el = document.createElement('div');
+        el.className = 'imgctx';
+        el.dir = this.dir();
+        const rebuild = () => {
+            const rebuilt = this.buildVideoCtxToolbar(vid);
+            this.vidCtx?.replaceWith(rebuilt);
+            this.vidCtx = rebuilt;
+            this.positionVidCtx();
+        };
+        const align = (a: 'left' | 'center' | 'right') => {
+            this.setVideoAlign(vid, a);
+            rebuild();
+        };
+        const isLeft = vid.style.float === 'left';
+        const isRight = vid.style.float === 'right';
+        const isCenter = !isLeft && !isRight && vid.style.marginLeft === 'auto' && vid.style.marginRight === 'auto';
+        const mkBtn = (icon: string, tip: string, on: boolean, fn: () => void) => {
+            const b = this.ctxBtn(icon, tip, fn);
+            b.classList.toggle('on', on);
+            return b;
+        };
+        el.append(
+            mkBtn(IC.alignleft, this.t('alignleft'), isLeft, () => align('left')),
+            mkBtn(IC.aligncenter, this.t('aligncenter'), isCenter, () => align('center')),
+            mkBtn(IC.alignright, this.t('alignright'), isRight, () => align('right')),
+            this.ctxSep(),
+            mkBtn(IC.trash, this.t('deletevideo'), false, () => {
+                vid.remove();
+                this.clearVidHandles();
+                this.onChange();
+            })
+        );
+        el.addEventListener('mousedown', (e) => e.preventDefault());
+        el.addEventListener('mouseenter', () => this.cancelVidHide());
+        el.addEventListener('mouseleave', () => {
+            this.cancelVidHide();
+            this.vidHideTimer = window.setTimeout(() => this.clearVidHandles(), 250);
+        });
+        document.body.appendChild(el);
+        return el;
+    }
+
+    private setVideoAlign(vid: HTMLElement, align: 'left' | 'center' | 'right'): void {
+        vid.style.float = '';
+        vid.style.display = '';
+        vid.style.marginLeft = '';
+        vid.style.marginRight = '';
+        vid.style.marginBottom = '';
+        if (align === 'left') {
+            vid.style.float = 'left';
+            vid.style.marginInlineEnd = '1em';
+            vid.style.marginBottom = '0.5em';
+        } else if (align === 'right') {
+            vid.style.float = 'right';
+            vid.style.marginInlineStart = '1em';
+            vid.style.marginBottom = '0.5em';
+        } else {
+            vid.style.display = 'block';
+            vid.style.marginLeft = 'auto';
+            vid.style.marginRight = 'auto';
+        }
+        this.onChange();
+    }
+
+    private positionVidCtx(): void {
+        if (!this.vidActive || !document.body.contains(this.vidActive)) {
+            this.clearVidHandles();
+            return;
+        }
+        const r = this.vidActive.getBoundingClientRect();
+        if (!this.vidCtx) return;
+        const cw = this.vidCtx.offsetWidth;
+        const ch = this.vidCtx.offsetHeight;
+        let cx = r.left + scrollX + (r.width - cw) / 2;
+        cx = Math.max(8 + scrollX, Math.min(cx, scrollX + innerWidth - cw - 8));
+        let cy = r.top + scrollY - ch - 8;
+        if (cy < this.ctxMinTop()) cy = r.bottom + scrollY + 8;
+        this.vidCtx.style.left = cx + 'px';
+        this.vidCtx.style.top = cy + 'px';
+    }
+
+    /* ---------------------------------------------------------- video dialog / embeds */
+    /** Maps a page URL from a known video host to its iframe player URL. Returns
+     *  null for anything else (e.g. direct .mp4 file URLs). */
+    private videoEmbedUrl(url: string): string | null {
+        let m = url.match(/^https?:\/\/(?:www\.|m\.)?youtube\.com\/watch\?(?:[^\s#]*[?&])?v=([\w-]{5,})/i);
+        if (!m) m = url.match(/^https?:\/\/(?:www\.)?(?:youtu\.be|youtube\.com\/(?:embed|shorts|live))\/([\w-]{5,})/i);
+        if (m) return 'https://www.youtube.com/embed/' + m[1];
+        m = url.match(/^https?:\/\/(?:www\.)?vimeo\.com\/(\d+)/i);
+        if (m) return 'https://player.vimeo.com/video/' + m[1];
+        m = url.match(/^https?:\/\/(?:www\.)?dailymotion\.com\/video\/(\w+)/i);
+        if (m) return 'https://www.dailymotion.com/embed/video/' + m[1];
+        return null;
+    }
+
+    private videoEmbedHTML(src: string, w = 560, h = 314): string {
+        return `<span class="video-embed" contenteditable="false"><iframe src="${src}" width="${w}" height="${h}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></span>`;
+    }
+
+    /** Insert/edit-video dialog with General (source/width/height), Embed (embed
+     *  code) and Advanced (alternative source, poster image) tabs. Hosted page
+     *  URLs (YouTube & co.) become iframe players; anything else becomes a
+     *  <video> tag. The General tab also offers the same upload path as before
+     *  (videoUploadHandler when configured, else inline base64). */
+    private videoDlg(): void {
+        this.saveSel();
+        let srcInp: HTMLInputElement;
+        let wInp: HTMLInputElement;
+        let hInp: HTMLInputElement;
+        let embedTa: HTMLTextAreaElement;
+        let altInp: HTMLInputElement;
+        let posterInp: HTMLInputElement;
+        const field = (labelKey: keyof I18nStrings, input: HTMLElement): HTMLElement => {
+            const f = document.createElement('div');
+            f.className = 'dfield';
+            const l = document.createElement('label');
+            l.textContent = this.t(labelKey);
+            f.append(l, input);
+            return f;
+        };
+        const urlInput = (): HTMLInputElement => {
+            const i = document.createElement('input');
+            i.type = 'url';
+            return i;
+        };
+        this.dialog(
+            this.t('videodlgttl'),
+            (body) => {
+                const tabs = document.createElement('div');
+                tabs.className = 'dtabs';
+                const panels: HTMLElement[] = [];
+                const mkTab = (labelKey: keyof I18nStrings, build: (p: HTMLElement) => void) => {
+                    const b = document.createElement('button');
+                    b.type = 'button';
+                    b.textContent = this.t(labelKey);
+                    const p = document.createElement('div');
+                    p.className = 'dtabpanel';
+                    build(p);
+                    const i = panels.length;
+                    panels.push(p);
+                    b.addEventListener('click', () => show(i));
+                    tabs.appendChild(b);
+                };
+                const show = (i: number) => {
+                    tabs.querySelectorAll('button').forEach((x, xi) => x.classList.toggle('on', xi === i));
+                    panels.forEach((x, xi) => (x.style.display = xi === i ? '' : 'none'));
+                };
+                mkTab('vidgeneral', (p) => {
+                    srcInp = urlInput();
+                    srcInp.placeholder = this.t('videourlph');
+                    const srcRow = document.createElement('div');
+                    srcRow.className = 'drow';
+                    const upBtn = document.createElement('button');
+                    upBtn.type = 'button';
+                    upBtn.className = 'txtbtn';
+                    upBtn.textContent = this.t('uploadvideo');
+                    const file = document.createElement('input');
+                    file.type = 'file';
+                    file.accept = this.options.videoFileTypes.join(',');
+                    file.style.display = 'none';
+                    upBtn.addEventListener('click', () => {
+                        file.value = '';
+                        file.click();
+                    });
+                    file.addEventListener('change', () => {
+                        const f = file.files?.[0];
+                        if (!f) return;
+                        upBtn.disabled = true;
+                        upBtn.textContent = this.t('uploading');
+                        const done = (url: string) => {
+                            srcInp.value = url;
+                            upBtn.disabled = false;
+                            upBtn.textContent = this.t('uploadvideo');
+                        };
+                        if (this.videoUploadHandler) {
+                            this.videoUploadHandler(f)
+                                .then(done)
+                                .catch((err) => {
+                                    upBtn.disabled = false;
+                                    upBtn.textContent = this.t('uploadfailed');
+                                    this.onVideoUploadError?.(err, f);
+                                });
+                        } else {
+                            const fr = new FileReader();
+                            fr.onload = () => done(fr.result as string);
+                            fr.readAsDataURL(f);
+                        }
+                    });
+                    srcRow.append(srcInp, upBtn, file);
+                    srcInp.style.flex = '1';
+                    p.appendChild(field('vidsource', srcRow));
+                    const dims = document.createElement('div');
+                    dims.className = 'drow';
+                    wInp = document.createElement('input');
+                    wInp.type = 'number';
+                    wInp.value = '560';
+                    hInp = document.createElement('input');
+                    hInp.type = 'number';
+                    hInp.value = '314';
+                    dims.append(field('tblwidth', wInp), field('tblheight', hInp));
+                    p.appendChild(dims);
+                });
+                mkTab('vidembed', (p) => {
+                    const hint = document.createElement('p');
+                    hint.textContent = this.t('vidembedhint');
+                    hint.style.cssText = 'margin:0 0 8px;color:#556;font-size:13.5px';
+                    embedTa = document.createElement('textarea');
+                    embedTa.style.cssText = 'width:100%;box-sizing:border-box;height:160px';
+                    p.append(hint, embedTa);
+                });
+                mkTab('vidadvanced', (p) => {
+                    altInp = urlInput();
+                    posterInp = urlInput();
+                    p.append(field('vidaltsource', altInp), field('vidposter', posterInp));
+                });
+                const wrap = document.createElement('div');
+                wrap.className = 'dtabbody';
+                panels.forEach((p) => wrap.appendChild(p));
+                body.append(tabs, wrap);
+                show(0);
+                setTimeout(() => srcInp.focus(), 0);
+            },
+            [
+                { label: this.t('cancel'), action: () => this.closeDlg() },
+                {
+                    label: this.t('save'),
+                    primary: true,
+                    action: () => {
+                        const embedCode = embedTa.value.trim();
+                        const src = srcInp.value.trim();
+                        const w = parseInt(wInp.value, 10) || 560;
+                        const h = parseInt(hInp.value, 10) || 314;
+                        this.closeDlg();
+                        if (!embedCode && !src) return;
+                        this.restoreSel();
+                        if (embedCode) {
+                            document.execCommand('insertHTML', false, `<span class="video-embed" contenteditable="false">${embedCode}</span>`);
+                            this.onChange();
+                            return;
+                        }
+                        const embed = this.videoEmbedUrl(src);
+                        if (embed) {
+                            document.execCommand('insertHTML', false, this.videoEmbedHTML(embed, w, h));
+                        } else {
+                            const alt = altInp.value.trim();
+                            const poster = posterInp.value.trim();
+                            document.execCommand(
+                                'insertHTML',
+                                false,
+                                `<video controls width="${w}" height="${h}"${poster ? ` poster="${this.escapeAttr(poster)}"` : ''}>` +
+                                    `<source src="${this.escapeAttr(src)}">${alt ? `<source src="${this.escapeAttr(alt)}">` : ''}</video>`
+                            );
+                        }
+                        this.onChange();
+                    }
+                }
+            ]
+        );
+    }
+
+    /* ---------------------------------------------------------- math / LaTeX formulas */
+    private renderMathHTML(latex: string, block: boolean): string {
+        try {
+            return katex.renderToString(latex, { throwOnError: false, displayMode: block, strict: 'ignore' });
+        } catch {
+            return '';
+        }
+    }
+
+    /** Shared by the math dialog, math paste, and math typing: renders `src` with
+     *  KaTeX and inserts it at the caret as the standard math element (inline span /
+     *  block div carrying its LaTeX source in data-latex). Block formulas get the
+     *  same \begin{aligned} wrapping the dialog applies, so pasted derivations align
+     *  their steps and re-open correctly in the edit dialog. */
+    private insertMathElement(src: string, block: boolean): void {
+        const latex = block ? `\\begin{aligned}${src}\\end{aligned}` : src;
+        const rendered = this.renderMathHTML(latex, block);
+        const tag = block ? 'div' : 'span';
+        document.execCommand(
+            'insertHTML',
+            false,
+            `<${tag} class="math-fable${block ? ' math-fable-block' : ''}" contenteditable="false" data-latex="${this.escapeAttr(src)}">${rendered}</${tag}>`
+        );
+    }
+
+    /** Recognizes a plain-text clipboard payload that is entirely one math formula:
+     *  $$…$$ / \[…\] (block), \(…\) (inline), a \begin{…}…\end{…} environment (block),
+     *  or $…$ (inline — only when the inside looks like LaTeX, so "$50" stays text).
+     *  Multi-line block content (a derivation pasted as separate lines) gets its lines
+     *  joined with \\ so each step lands on its own line. Returns null for anything
+     *  else, letting the normal paste pipeline run unchanged. */
+    private mathFromClipboard(text: string): { latex: string; block: boolean } | null {
+        const t = text.trim();
+        if (!t) return null;
+        const block = t.match(/^\$\$([\s\S]+)\$\$$/) || t.match(/^\\\[([\s\S]+)\\\]$/);
+        if (block) {
+            const src = block[1].trim();
+            if (!src || src.includes('$')) return null;
+            return { latex: this.joinDerivationLines(src), block: true };
+        }
+        if (/^\\begin\{[a-zA-Z*]+\}[\s\S]+\\end\{[a-zA-Z*]+\}$/.test(t)) {
+            return { latex: this.joinDerivationLines(t), block: true };
+        }
+        const inline = t.match(/^\\\(([\s\S]+)\\\)$/) || t.match(/^\$([^$\n]+)\$$/);
+        if (inline) {
+            const src = inline[1].trim();
+            if (!src || src.includes('$')) return null;
+            if (t.startsWith('$') && !/[\\^_{}=]/.test(src)) return null;
+            return { latex: src, block: false };
+        }
+        return null;
+    }
+
+    /** A derivation pasted as separate lines has no explicit \\ row breaks — add them.
+     *  Content that already breaks rows itself (\\ present, or a \begin environment
+     *  managing its own layout) only has its newlines collapsed to spaces. */
+    private joinDerivationLines(src: string): string {
+        if (!/\n/.test(src)) return src;
+        if (/\\\\/.test(src) || /\\begin\{/.test(src)) return src.replace(/\s*\n\s*/g, ' ');
+        return src
+            .split(/\n+/)
+            .map((l) => l.trim())
+            .filter(Boolean)
+            .join(' \\\\ ');
+    }
+
+    /** Typing "$…$" converts to an inline formula the moment the closing "$" is typed,
+     *  so math can be written in place without opening the dialog. Only kicks in when
+     *  the run since the opening "$" parses as valid LaTeX and contains LaTeX-ish
+     *  syntax (\ ^ _ { } =) — a literal "$5 and 3$" stays plain text. */
+    private tryMathTyping(e: KeyboardEvent): void {
+        const sel = window.getSelection();
+        if (!sel || !sel.isCollapsed || !sel.anchorNode) return;
+        const node = sel.anchorNode;
+        if (node.nodeType !== Node.TEXT_NODE || !this.ed.contains(node)) return;
+        if (node.parentElement?.closest('.math-fable, pre, code')) return;
+        const before = (node.textContent || '').slice(0, sel.anchorOffset);
+        const m = before.match(/(?:^|[^\\$])\$([^$]+)$/);
+        if (!m) return;
+        const src = m[1];
+        if (/^\s|\s$/.test(src) || !/[\\^_{}=]/.test(src)) return;
+        const rendered = this.renderMathHTML(src, false);
+        if (!rendered || rendered.includes('katex-error')) return;
+        e.preventDefault();
+        const range = document.createRange();
+        range.setStart(node, sel.anchorOffset - src.length - 1);
+        range.setEnd(node, sel.anchorOffset);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        this.insertMathElement(src, false);
+        this.onChange();
+    }
+
+    private mathDlg(existing?: HTMLElement): void {
+        this.saveSel();
+        const isBlock = existing?.classList.contains('math-fable-block') ?? false;
+        const initialLatex = existing?.dataset.latex ? this.unescapeAttr(existing.dataset.latex) : '';
+        let ta: HTMLTextAreaElement;
+        let derivChk: HTMLInputElement;
+        let preview: HTMLElement;
+        const updatePreview = () => {
+            const src = ta.value || '';
+            const block = derivChk.checked;
+            const latex = block ? `\\begin{aligned}${src}\\end{aligned}` : src;
+            preview.innerHTML = this.renderMathHTML(latex, block);
+        };
+        this.dialog(
+            this.t('mathdlgttl'),
+            (body) => {
+                ta = document.createElement('textarea');
+                ta.value = initialLatex;
+                ta.placeholder = 'e.g. x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}';
+                ta.style.cssText = 'width:360px;max-width:100%;min-height:80px;font-family:monospace;font-size:13px';
+                const chkRow = document.createElement('label');
+                chkRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin:8px 0;font-size:13.5px;color:#445';
+                derivChk = document.createElement('input');
+                derivChk.type = 'checkbox';
+                derivChk.checked = isBlock;
+                chkRow.append(derivChk, document.createTextNode(this.t('mathderivation')));
+                preview = document.createElement('div');
+                preview.className = 'math-preview';
+                preview.style.cssText = 'min-height:40px;margin-top:8px;padding:10px;border:1px solid #e1e5ea;border-radius:6px;overflow:auto';
+                ta.addEventListener('input', updatePreview);
+                derivChk.addEventListener('change', updatePreview);
+                body.append(ta, chkRow, preview);
+                setTimeout(() => {
+                    ta.focus();
+                    updatePreview();
+                }, 0);
+            },
+            [
+                { label: this.t('cancel'), action: () => this.closeDlg() },
+                {
+                    label: this.t('save'),
+                    primary: true,
+                    action: () => {
+                        const src = ta.value.trim();
+                        this.closeDlg();
+                        if (!src) return;
+                        const block = derivChk.checked;
+                        if (existing) {
+                            const latex = block ? `\\begin{aligned}${src}\\end{aligned}` : src;
+                            existing.className = block ? 'math-fable math-fable-block' : 'math-fable';
+                            existing.dataset.latex = this.escapeAttr(src);
+                            existing.innerHTML = this.renderMathHTML(latex, block);
+                            this.clearMathSel();
+                            this.onChange();
+                            return;
+                        }
+                        this.restoreSel();
+                        this.insertMathElement(src, block);
+                        this.onChange();
+                    }
+                }
+            ]
+        );
+    }
+
+    private escapeAttr(s: string): string {
+        return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    }
+
+    private unescapeAttr(s: string): string {
+        return s.replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+    }
+
+    private clearMathSel(): void {
+        this.mathCtx?.remove();
+        this.mathCtx = null;
+        this.mathActive?.classList.remove('math-selected');
+        this.mathActive = null;
+    }
+
+    private selectMathEl(el: HTMLElement): void {
+        if (this.mathActive === el) return;
+        this.clearMathSel();
+        this.mathActive = el;
+        el.classList.add('math-selected');
+        this.mathCtx = this.buildMathCtxToolbar(el);
+        this.positionMathCtx();
+    }
+
+    private buildMathCtxToolbar(el: HTMLElement): HTMLElement {
+        const ctx = document.createElement('div');
+        ctx.className = 'imgctx';
+        ctx.dir = this.dir();
+        ctx.append(
+            this.ctxBtn(IC.editic, this.t('editmath'), () => this.mathDlg(el)),
+            this.ctxSep(),
+            this.ctxBtn(IC.trash, this.t('deletemath'), () => {
+                el.remove();
+                this.clearMathSel();
+                this.onChange();
+            })
+        );
+        ctx.addEventListener('mousedown', (e) => e.preventDefault());
+        document.body.appendChild(ctx);
+        return ctx;
+    }
+
+    private positionMathCtx(): void {
+        if (!this.mathActive || !document.body.contains(this.mathActive)) {
+            this.clearMathSel();
+            return;
+        }
+        const r = this.mathActive.getBoundingClientRect();
+        if (!this.mathCtx) return;
+        const cw = this.mathCtx.offsetWidth;
+        const ch = this.mathCtx.offsetHeight;
+        let cx = r.left + scrollX + (r.width - cw) / 2;
+        cx = Math.max(8 + scrollX, Math.min(cx, scrollX + innerWidth - cw - 8));
+        let cy = r.top + scrollY - ch - 8;
+        if (cy < this.ctxMinTop()) cy = r.bottom + scrollY + 8;
+        this.mathCtx.style.left = cx + 'px';
+        this.mathCtx.style.top = cy + 'px';
     }
 
     /* ---------------------------------------------------------- templates */
@@ -3024,6 +3904,26 @@ export class FableEditor implements FableEditorApi {
             fr.readAsDataURL(imgItem.getAsFile() as Blob);
             return;
         }
+        if (!html) {
+            /* plain-text pastes get two additive pre-checks before the normal text
+               pipeline runs (the paste engine itself is untouched): a clipboard that
+               is entirely one LaTeX formula/derivation becomes a rendered math
+               element, and a bare video page URL (YouTube & co.) becomes an
+               embedded player. Anything else falls through unchanged. */
+            const text = cd.getData('text/plain');
+            const math = this.mathFromClipboard(text);
+            if (math) {
+                this.insertMathElement(math.latex, math.block);
+                this.onChange();
+                return;
+            }
+            const embed = /^\S+$/.test(text.trim()) ? this.videoEmbedUrl(text.trim()) : null;
+            if (embed) {
+                document.execCommand('insertHTML', false, this.videoEmbedHTML(embed));
+                this.onChange();
+                return;
+            }
+        }
         if (html) {
             document.execCommand('insertHTML', false, cleanPastedHTML(html, this.dir()));
         } else {
@@ -3038,6 +3938,9 @@ export class FableEditor implements FableEditorApi {
         this.closeDlg();
         this.clearTableHandles();
         this.clearImgPlaceholderSel();
+        this.clearVphPlaceholderSel();
+        this.clearVidHandles();
+        this.clearMathSel();
         this.shell.dir = this.dir();
         this.ed.dir = this.dir();
         if (this.options.menubar) this.buildMenubar();

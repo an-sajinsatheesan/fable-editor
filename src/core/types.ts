@@ -49,6 +49,16 @@ export interface EditorInitOptions {
   imageUploadHandler?: (file: File) => Promise<string>;
   /** Called when imageUploadHandler rejects, so the host app can surface it. */
   onImageUploadError?: (error: unknown, file: File) => void;
+  /** MIME types accepted by the native video file picker (the `accept` attribute).
+   *  Defaults to `['video/mp4','video/webm','video/ogg']`. */
+  videoFileTypes?: string[];
+  /** Called when a user picks or drops a video. Resolve with the URL to
+   *  insert (e.g. after uploading to S3/Azure Blob/your own server). If
+   *  omitted, videos are inlined as base64 data URIs instead. Mirrors
+   *  `imageUploadHandler` — the engine owns all placeholder/progress/insert UI. */
+  videoUploadHandler?: (file: File) => Promise<string>;
+  /** Called when videoUploadHandler rejects, so the host app can surface it. */
+  onVideoUploadError?: (error: unknown, file: File) => void;
 }
 
 export interface FableEditorApi {

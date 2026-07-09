@@ -13,8 +13,10 @@ A rich text editor packaged as an npm library with first-class React and Angular
 | Fonts & formatting | Configurable font list (`fontFamilyFormats`), sizes, line-height, word-spacing, text/background color, change case |
 | Custom content styling | `contentStyle` injects scoped CSS into the editable area (e.g. default font/size) |
 | Images | Placeholder upload UI, drag-and-drop, configurable accepted file types (`imageFileTypes`), pluggable async upload handler |
+| Video | Insert/edit dialog with **General** (source URL / upload / width / height), **Embed** (paste embed code) and **Advanced** (alternative source, poster image) tabs. YouTube / Vimeo / Dailymotion page URLs become embedded players — including when pasted directly into the editor. Template media slots can host a video instead of an image. |
+| Math formulas | Insert inline or multi-line LaTeX derivations, rendered with [KaTeX](https://katex.org) — click an inserted formula to edit or delete it. Pasting LaTeX from the clipboard (`$…$`, `$$…$$`, `\(…\)`, `\[…\]`, `\begin{…}…\end{…}`) auto-renders it, and typing `$x^2$` inline converts as soon as the closing `$` is typed |
 | Documents | Import `.docx` files, source-code view, print preview |
-| Productivity | Undo/redo, revision history, autosave draft restore, word count, special characters, page breaks |
+| Productivity | Undo/redo, revision history, autosave draft restore, word count, special characters & emoji pickers (category tabs + glyph grid), page breaks |
 | Fullscreen | Toggle fullscreen editing |
 | Help | Built-in shortcuts/help dialog |
 
@@ -68,8 +70,37 @@ editor.destroy();
 | `imageFileTypes` | `string[]` | common image MIME types | `accept` list for the native image file picker. |
 | `imageUploadHandler` | `(file: File) => Promise<string>` | — | Resolve with a URL after uploading; omit to inline images as base64. |
 | `onImageUploadError` | `(error, file) => void` | — | Called when `imageUploadHandler` rejects. |
+| `videoFileTypes` | `string[]` | `['video/mp4','video/webm','video/ogg']` | `accept` list for the native video file picker. |
+| `videoUploadHandler` | `(file: File) => Promise<string>` | — | Resolve with a URL after uploading; omit to inline videos as base64. |
+| `onVideoUploadError` | `(error, file) => void` | — | Called when `videoUploadHandler` rejects. |
 | `draftKey` | `string` | current page path | Storage key suffix for autosaved drafts. |
 | `onChange` / `onReady` | functions | — | Content-change and ready callbacks (usually set by the React/Angular wrapper instead). |
+
+> **Math formulas:** the "Insert math formula" toolbar/menu item renders LaTeX with [KaTeX](https://katex.org), which FableEditor uses as a rendering dependency but does not bundle the stylesheet for (to avoid shipping KaTeX's webfonts in every install). If you use this feature, also import KaTeX's CSS once in your app: `import 'katex/dist/katex.min.css'`.
+
+### Math from the clipboard / keyboard
+
+Besides the dialog, formulas can enter the document two more ways — the regular paste pipeline is untouched, these only kick in when the clipboard is *entirely* one formula:
+
+- **Paste** `$$…$$`, `\[…\]` or a `\begin{…}…\end{…}` environment → a **block** formula on its own line. A derivation pasted as separate lines gets each step on its own row automatically.
+- **Paste** `\(…\)` or a LaTeX-looking `$…$` → an **inline** formula at the caret (same line). Plain text like `$5 and $10` is left alone.
+- **Type** `$x^2$` — the moment the closing `$` is typed, the run converts to an inline formula (only when it parses as valid LaTeX; a literal `$5` stays text).
+
+### Toolbar & menubar configuration
+
+The `toolbar`/`menubar` options accept the same style of layout string as TinyMCE — `|` separates visual groups, spaces separate items:
+
+```ts
+new FableEditor({
+  target: document.querySelector('#default-editor')!,
+  toolbar:
+    'undo redo | styles | bold italic underline strikethrough | ' +
+    'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image',
+  menubar: 'file edit insert format'
+});
+```
+
+Available toolbar items: `undo redo preview print importword revhistory fontfamily fontsize fontsizeincrease fontsizedecrease bold italic underline strikethrough forecolor backcolor alignleft aligncenter alignright alignjustify bullist numlist outdent indent link blockquote changecase lineheight wordspacing removeformat blocks ltr rtl quickimage quickvideo quicktable mathformula template charmap emoji fullscreen sourcecode`. The TinyMCE names `styles` (→ `blocks`), `image` (→ `quickimage`), `media` (→ `quickvideo`) and `table` (→ `quicktable`) are accepted as aliases, so a typical TinyMCE toolbar string works unchanged. Unknown tokens are skipped with a console warning. Menubar keys: `file edit view insert format tools table help`.
 
 ## React
 
@@ -86,12 +117,15 @@ function App() {
       onChange={setValue}
       language="en"
       height={400}
+      toolbar="undo redo | styles | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image"
     />
   );
 }
 ```
 
-Props: `value`, `defaultValue`, `onChange`, `language`, `height`, `menubar`, `toolbar`, `statusbar`, `readonly`, `fontFamilyFormats`, `contentStyle`, `imageFileTypes`, `imageUploadHandler`, `onImageUploadError`, `init`, `className`, `style` (see the [`init` options](#init-options) table above — every option is also a top-level prop). A ref exposes `getContent`, `setContent`, `insertContent`, `setLanguage`, `focus`, `destroy`.
+`toolbar`/`menubar` accept the same layout strings as the core option (see [Toolbar & menubar configuration](#toolbar--menubar-configuration)), so each app can show exactly the controls it needs.
+
+Props: `value`, `defaultValue`, `onChange`, `language`, `height`, `menubar`, `toolbar`, `statusbar`, `readonly`, `fontFamilyFormats`, `contentStyle`, `imageFileTypes`, `imageUploadHandler`, `onImageUploadError`, `videoFileTypes`, `videoUploadHandler`, `onVideoUploadError`, `init`, `className`, `style` (see the [`init` options](#init-options) table above — every option is also a top-level prop). A ref exposes `getContent`, `setContent`, `insertContent`, `setLanguage`, `focus`, `destroy`.
 
 ## Angular
 
@@ -118,10 +152,15 @@ export class AppModule {}
 Use in a template:
 
 ```html
-<fable-editor [(ngModel)]="content" language="en" [height]="400"></fable-editor>
+<fable-editor
+  [(ngModel)]="content"
+  language="en"
+  [height]="400"
+  toolbar="undo redo | styles | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image">
+</fable-editor>
 ```
 
-Inputs: `language`, `height`, `menubar`, `toolbar`, `statusbar`, `readonly`, `init`. `menubar`/`toolbar` accept a string directly (e.g. `[toolbar]="'undo redo | bold italic'"`); `fontFamilyFormats`, `contentStyle`, `imageFileTypes`, `imageUploadHandler`, and `onImageUploadError` aren't top-level inputs — pass them via `[init]="{ contentStyle: '...' }"` (see the [`init` options](#init-options) table above). Outputs: `editorChange`, `editorReady`. Works with `ngModel` and `formControlName`.
+Inputs: `language`, `height`, `menubar`, `toolbar`, `statusbar`, `readonly`, `init`. `menubar`/`toolbar` accept a string directly (e.g. `[toolbar]="'undo redo | bold italic'"`); `fontFamilyFormats`, `contentStyle`, `imageFileTypes`, `imageUploadHandler`, `onImageUploadError`, `videoFileTypes`, `videoUploadHandler`, and `onVideoUploadError` aren't top-level inputs — pass them via `[init]="{ contentStyle: '...' }"` (see the [`init` options](#init-options) table above). Outputs: `editorChange`, `editorReady`. Works with `ngModel` and `formControlName`.
 
 ## Development & testing
 

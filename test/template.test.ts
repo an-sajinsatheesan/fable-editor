@@ -133,7 +133,8 @@ describe('template blocks', () => {
     const ph = tpl.querySelector('.img-ph') as HTMLElement;
     mousedownIn(ph);
     const phCtx = document.body.querySelector('.img-ph-ctx') as HTMLElement;
-    (phCtx.querySelectorAll('button')[2] as HTMLElement).click(); // trash
+    // slot buttons inside a template: upload, link, switch-to-video, trash
+    (phCtx.querySelectorAll('button')[3] as HTMLElement).click(); // trash
     expect(tpl.querySelector('.tpl-media')).toBeNull();
     expect(container.querySelector('.earea .tpl')).toBeTruthy(); // text block stays
   });
