@@ -93,6 +93,9 @@ export interface I18nStrings {
   tblcellpadding: string;
   tblborder: string;
   tblalign: string;
+  tblalignleft: string;
+  tblaligncenter: string;
+  tblalignright: string;
   alignnone: string;
   quote: string;
   link: string;
@@ -283,6 +286,9 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     tblcellpadding: 'Cell padding',
     tblborder: 'Border width',
     tblalign: 'Alignment',
+    tblalignleft: 'Align table left',
+    tblaligncenter: 'Center table',
+    tblalignright: 'Align table right',
     alignnone: 'None',
     quote: 'Blockquote',
     link: 'Link…',
@@ -471,6 +477,9 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     tblcellpadding: 'حشو الخلايا',
     tblborder: 'عرض الحدود',
     tblalign: 'المحاذاة',
+    tblalignleft: 'محاذاة الجدول لليسار',
+    tblaligncenter: 'توسيط الجدول',
+    tblalignright: 'محاذاة الجدول لليمين',
     alignnone: 'بدون',
     quote: 'اقتباس',
     link: 'رابط…',

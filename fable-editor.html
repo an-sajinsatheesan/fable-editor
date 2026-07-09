@@ -905,6 +905,120 @@
                transform: scale(1.12);
           }
 
+          /* custom color footer: current color, no-color, custom-color wheel */
+          .cfoot {
+               display: flex;
+               align-items: center;
+               justify-content: space-between;
+               padding: 6px;
+          }
+
+          .cswatch {
+               width: 26px;
+               height: 26px;
+               flex: none;
+               border: 1px solid rgba(34, 47, 62, .18);
+               border-radius: 5px;
+               padding: 0;
+               position: relative;
+          }
+
+          .cswatch.cur {
+               cursor: default;
+          }
+
+          .cswatch.cur svg {
+               position: absolute;
+               inset: 0;
+               margin: auto;
+               width: 14px;
+               height: 14px;
+               stroke: #fff;
+               fill: none;
+               stroke-width: 2.4;
+               stroke-linecap: round;
+               stroke-linejoin: round;
+               filter: drop-shadow(0 0 1px rgba(0, 0, 0, .5));
+          }
+
+          .cswatch.nocolor {
+               cursor: pointer;
+               background: #fff;
+          }
+
+          .cswatch.nocolor::after {
+               content: "";
+               position: absolute;
+               inset: 1px;
+               border-radius: 3px;
+               background: linear-gradient(to top left, transparent calc(50% - 1px), #e03e2d calc(50% - 1px), #e03e2d calc(50% + 1px), transparent calc(50% + 1px));
+          }
+
+          .cswatch.nocolor:hover {
+               border-color: rgba(34, 47, 62, .35);
+          }
+
+          .cwheel {
+               cursor: pointer;
+               display: flex;
+               align-items: center;
+               justify-content: center;
+          }
+
+          .cwheel:hover {
+               border-color: rgba(34, 47, 62, .35);
+          }
+
+          .cwheel svg {
+               width: 20px;
+               height: 20px;
+               stroke: #556;
+               fill: none;
+               stroke-width: 1.6;
+               stroke-linecap: round;
+               stroke-linejoin: round;
+          }
+
+          .cwheel svg .f {
+               fill: #556;
+               stroke: none;
+          }
+
+          .cwheel input[type=color] {
+               position: absolute;
+               width: 1px;
+               height: 1px;
+               opacity: 0;
+               overflow: hidden;
+               border: 0;
+               padding: 0;
+          }
+
+          /* custom tooltip bubble — replaces the browser's native title tooltips
+             across the whole editor UI (toolbar, menus, popups, context toolbars) */
+          .etip {
+               position: fixed;
+               z-index: 2147483000;
+               max-width: 260px;
+               padding: 5px 10px;
+               border-radius: 6px;
+               background: #222f3e;
+               color: #fff;
+               font-size: 12px;
+               line-height: 1.4;
+               letter-spacing: .1px;
+               box-shadow: 0 4px 16px rgba(34, 47, 62, .3);
+               pointer-events: none;
+               opacity: 0;
+               transform: translateY(3px);
+               transition: opacity .12s ease, transform .12s ease;
+          }
+
+          .etip.show {
+               opacity: 1;
+               transform: none;
+          }
+
           /* char / emoji map: fixed category tabs left, glyph grid right */
           .chmap {
                display: flex;

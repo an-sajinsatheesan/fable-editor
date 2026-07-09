@@ -125,7 +125,7 @@ describe('cell background', () => {
     const ctx = document.body.querySelector('.tblctx') as HTMLElement;
     (Array.from(ctx.querySelectorAll('button')).find((b) => b.title === 'Cell background') as HTMLElement).click();
     const pop = document.body.querySelector('.pop') as HTMLElement;
-    const remove = Array.from(pop.querySelectorAll('button.mi')).find((b) => b.textContent!.includes('Remove color')) as HTMLElement;
+    const remove = pop.querySelector('button.cswatch.nocolor') as HTMLElement;
     remove.click();
     expect(cell.style.backgroundColor).toBe('');
   });
