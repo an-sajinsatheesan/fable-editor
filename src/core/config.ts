@@ -3,8 +3,8 @@
 export const DEFAULT_TOOLBAR =
   'undo redo | preview print | importword revhistory | fontfamily fontsize | fontsizeincrease fontsizedecrease | ' +
   'bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | ' +
-  'bullist numlist | outdent indent | link blockquote changecase lineheight wordspacing letterspacing | removeformat | blocks | ' +
-  'ltr rtl | quickimage quickvideo quicktable template charmap emoji | fullscreen sourcecode';
+  'bullist numlist | outdent indent | link blockquote code changecase lineheight wordspacing letterspacing | removeformat | blocks | ' +
+  'ltr rtl | quickimage quickvideo quicktable codesample template charmap emoji | fullscreen sourcecode';
 
 /** Transcribed from the editor's built-in menu keys so that `menubar: true` (the
  *  default) renders identically to the hard-coded original. */
@@ -42,6 +42,26 @@ export const LINE_HEIGHTS = ['1', '1.15', '1.4', '1.5', '1.75', '2', '2.5', '3']
 export const WORD_SPACINGS = ['1px', '2px', '4px', '6px', '8px', '12px'];
 
 export const LETTER_SPACINGS = ['0.5px', '1px', '1.5px', '2px', '3px', '4px'];
+
+/** Languages offered by the code-sample dialog: [value stored in data-lang, label]. */
+export const CODE_LANGS: [string, string][] = [
+  ['plain', 'Plain text'],
+  ['html', 'HTML/XML'],
+  ['css', 'CSS'],
+  ['javascript', 'JavaScript'],
+  ['typescript', 'TypeScript'],
+  ['json', 'JSON'],
+  ['python', 'Python'],
+  ['java', 'Java'],
+  ['csharp', 'C#'],
+  ['cpp', 'C/C++'],
+  ['php', 'PHP'],
+  ['ruby', 'Ruby'],
+  ['go', 'Go'],
+  ['rust', 'Rust'],
+  ['sql', 'SQL'],
+  ['bash', 'Bash/Shell']
+];
 
 export const BLOCKS: [string, string][] = [
   ['p', 'para'],

@@ -7,7 +7,8 @@ A rich text editor packaged as an npm library with first-class React and Angular
 | Feature | Details |
 |---|---|
 | Toolbar & menubar | Configurable via `toolbar`/`menubar` strings (`\|`-separated groups), or use the built-in defaults. Menus: File, Edit, View, Insert, Format, Tools, Table, Help |
-| Tables | Resize handles, row/column insert & delete, cell/row/column/table properties, context toolbar |
+| Responsive toolbar | On narrow screens (mobile/tablet) — or in a narrow host container — the toolbar collapses to a single row with a trailing `…` button that expands/collapses the full set. Automatic, width-driven, no configuration needed |
+| Tables | Resize handles, row/column insert & delete, row/column reordering (move a row up/down or a column left/right from the context toolbar or Table menu), cell background color picker (build header rows in one click), cell/row/column/table properties, context toolbar |
 | Paste handling | PowerPaste-style clean paste from Word / Google Docs / Excel |
 | Internationalization | English / Arabic, automatic RTL/LTR switching |
 | Fonts & formatting | Configurable font list (`fontFamilyFormats`), sizes, line-height, word-spacing, letter-spacing, text/background color, change case |
@@ -15,6 +16,7 @@ A rich text editor packaged as an npm library with first-class React and Angular
 | Custom content styling | `contentStyle` injects scoped CSS into the editable area (e.g. default font/size) |
 | Images | Placeholder upload UI, drag-and-drop, configurable accepted file types (`imageFileTypes`), pluggable async upload handler |
 | Video | Insert/edit dialog with **General** (source URL / upload / width / height), **Embed** (paste embed code) and **Advanced** (alternative source, poster image) tabs. YouTube / Vimeo / Dailymotion page URLs become embedded players — including when pasted directly into the editor. Template media slots can host a video instead of an image. |
+| Code | Inline `code` (toolbar button, or type `` `snippet` `` — converts on the closing backtick) and code sample blocks: a dialog with language dropdown + paste-in textarea inserts a styled block with a language header; click a block to edit, copy or delete it. No dependencies, no highlighting engine |
 | Documents | Import `.docx` files, source-code view, print preview |
 | Productivity | Undo/redo, revision history, autosave draft restore, word count, special characters & emoji pickers (category tabs + glyph grid), page breaks |
 | Fullscreen | Toggle fullscreen editing |
@@ -108,7 +110,7 @@ new FableEditor({
 });
 ```
 
-Available toolbar items: `undo redo preview print importword revhistory fontfamily fontsize fontsizeincrease fontsizedecrease bold italic underline strikethrough forecolor backcolor alignleft aligncenter alignright alignjustify bullist numlist outdent indent link blockquote changecase lineheight wordspacing letterspacing removeformat blocks ltr rtl quickimage quickvideo quicktable template charmap emoji fullscreen sourcecode`. The TinyMCE names `styles` (→ `blocks`), `image` (→ `quickimage`), `media` (→ `quickvideo`) and `table` (→ `quicktable`) are accepted as aliases, so a typical TinyMCE toolbar string works unchanged. Unknown tokens are skipped with a console warning. Menubar keys: `file edit view insert format tools table help`.
+Available toolbar items: `undo redo preview print importword revhistory fontfamily fontsize fontsizeincrease fontsizedecrease bold italic underline strikethrough forecolor backcolor alignleft aligncenter alignright alignjustify bullist numlist outdent indent link blockquote code changecase lineheight wordspacing letterspacing removeformat blocks ltr rtl quickimage quickvideo quicktable codesample template charmap emoji fullscreen sourcecode`. The TinyMCE names `styles` (→ `blocks`), `image` (→ `quickimage`), `media` (→ `quickvideo`) and `table` (→ `quicktable`) are accepted as aliases, so a typical TinyMCE toolbar string works unchanged. Unknown tokens are skipped with a console warning. Menubar keys: `file edit view insert format tools table help`.
 
 ## React
 

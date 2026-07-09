@@ -26,7 +26,8 @@
                background: #fff;
                border-radius: 6px;
                padding: 6px 14px;
-               font: 13px inherit;
+               font-size: 13px;
+               font-family: inherit;
                cursor: pointer
           }
 
@@ -55,6 +56,16 @@
                border-radius: 0;
           }
 
+          /* dialogs, popups and context toolbars mount on document.body, so they
+             inherit the host page font — give them the editor UI font */
+          .dlg,
+          .pop,
+          .imgctx,
+          .selctx,
+          .tblctx {
+               font-family: var(--fable-ui-font, 'Noto Sans', 'Segoe UI', system-ui, Arial, sans-serif);
+          }
+
           /* menubar */
           .mnb {
                display: flex;
@@ -67,7 +78,9 @@
           .mnb button {
                border: 0;
                background: none;
-               font: 14px/1 inherit;
+               font-size: 14px;
+               line-height: 1;
+               font-family: inherit;
                color: #222f3e;
                padding: 5px 20px;
                border-radius: 3px;
@@ -91,6 +104,34 @@
                border-radius: 12px;
                background: #fff;
                box-shadow: 0 1px 2px rgba(34, 47, 62, .04);
+               position: relative;
+          }
+
+          /* responsive one-line toolbar: when the controls overflow a single row
+             (mobile/tablet, or a narrow host container) the toolbar clips to one
+             row and shows a trailing "…" button that expands the full set */
+          .tbr.tbr-measure,
+          .tbr.collapsible:not(.expanded) {
+               flex-wrap: nowrap;
+               overflow: hidden;
+               padding-inline-end: 46px;
+          }
+
+          .tbr .tbr-more {
+               display: none;
+          }
+
+          .tbr.collapsible .tbr-more {
+               display: flex;
+               position: absolute;
+               inset-inline-end: 6px;
+               top: 5px;
+               background: var(--fable-tgrp-bg, #f1f3f6);
+               border-radius: 20px;
+          }
+
+          .tbr.collapsible .tbr-more.on {
+               background: color-mix(in srgb, var(--fable-primary, #df3c2b) 18%, #fff);
           }
 
           .tgrp {
@@ -196,7 +237,9 @@
                height: 32px;
                margin: 0 1px;
                padding: 0 8px;
-               font: 500 13.5px inherit;
+               font-weight: 500;
+               font-size: 13.5px;
+               font-family: inherit;
                color: #2f3744;
                cursor: pointer;
           }
@@ -609,6 +652,58 @@
                max-width: 100%;
           }
 
+          /* inline code runs */
+          .earea code {
+               background: #f4f5f7;
+               border: 1px solid #e4e7eb;
+               border-radius: 4px;
+               padding: 1px 5px;
+               font: 0.9em Consolas, 'Courier New', monospace;
+          }
+
+          /* code sample blocks — header bar shows the language */
+          .earea pre.code-block {
+               position: relative;
+               margin: 0.6em 0;
+               padding: 36px 14px 12px;
+               background: #f7f8fa;
+               border: 1px solid #e4e7eb;
+               border-radius: 8px;
+               overflow-x: auto;
+               font: 13px/1.55 Consolas, 'Courier New', monospace;
+               white-space: pre;
+               cursor: pointer;
+               direction: ltr;
+               text-align: left;
+          }
+
+          .earea pre.code-block::before {
+               content: attr(data-lang-label);
+               position: absolute;
+               top: 0;
+               left: 0;
+               right: 0;
+               padding: 5px 12px;
+               font: 11px/1.4 var(--fable-ui-font, 'Noto Sans', 'Segoe UI', system-ui, Arial, sans-serif);
+               letter-spacing: .4px;
+               color: #667;
+               background: #eef0f3;
+               border-bottom: 1px solid #e4e7eb;
+               border-radius: 7px 7px 0 0;
+          }
+
+          .earea pre.code-block code {
+               background: none;
+               border: 0;
+               padding: 0;
+               font: inherit;
+          }
+
+          .earea pre.code-block.code-selected {
+               outline: 2px solid var(--fable-primary, #df3c2b);
+               outline-offset: 1px;
+          }
+
           .img-handle {
                position: absolute;
                width: 10px;
@@ -686,7 +781,8 @@
                border: 1px solid #cfd6df;
                border-radius: 5px;
                padding: 0 9px;
-               font: 13.5px inherit;
+               font-size: 13.5px;
+               font-family: inherit;
                margin: 0 2px;
           }
 
@@ -697,7 +793,8 @@
           .imgctx button.txtbtn {
                width: auto;
                padding: 0 12px;
-               font: 13.5px inherit;
+               font-size: 13.5px;
+               font-family: inherit;
                white-space: nowrap;
           }
 
@@ -845,7 +942,8 @@
                background: none;
                padding: 6px 10px;
                border-radius: 5px;
-               font: 14px inherit;
+               font-size: 14px;
+               font-family: inherit;
                color: #222f3e;
                cursor: pointer;
                text-align: start;
@@ -1133,7 +1231,8 @@
                background: none;
                border-radius: 5px;
                padding: 8px 10px;
-               font: 13.5px inherit;
+               font-size: 13.5px;
+               font-family: inherit;
                color: #222f3e;
                cursor: pointer;
           }
@@ -1204,7 +1303,8 @@
                text-align: start;
                padding: 8px 10px;
                border-radius: 6px;
-               font: 13.5px inherit;
+               font-size: 13.5px;
+               font-family: inherit;
                color: #222f3e;
                cursor: pointer;
                white-space: nowrap;
@@ -1357,7 +1457,8 @@
           .dlg footer button {
                border-radius: 6px;
                padding: 8px 16px;
-               font: 14px inherit;
+               font-size: 14px;
+               font-family: inherit;
                cursor: pointer;
                border: 1px solid #cfd6df;
                background: #fff;
@@ -1393,7 +1494,8 @@
                border: 0;
                background: none;
                padding: 8px 14px;
-               font: 14px inherit;
+               font-size: 14px;
+               font-family: inherit;
                color: #556;
                cursor: pointer;
                border-bottom: 2px solid transparent;
@@ -1430,12 +1532,110 @@
                color: #445;
           }
 
-          .dlg .dfield input {
+          .dlg .dfield input,
+          .dlg .dfield select {
                border: 1px solid #cfd6df;
                border-radius: 6px;
                padding: 8px 10px;
-               font: 14px inherit;
+               font-size: 14px;
+               font-family: inherit;
                min-width: 0;
+               background: #fff;
+               color: #222f3e;
+          }
+
+          /* custom dropdown for dialog fields */
+          .dlg .dsel {
+               position: relative;
+          }
+
+          .dlg .dsel-btn {
+               display: flex;
+               align-items: center;
+               justify-content: space-between;
+               gap: 8px;
+               width: 100%;
+               box-sizing: border-box;
+               border: 1px solid #cfd6df;
+               border-radius: 6px;
+               padding: 8px 10px;
+               font-size: 14px;
+               font-family: inherit;
+               background: #fff;
+               color: #222f3e;
+               cursor: pointer;
+               text-align: start;
+          }
+
+          .dlg .dsel-btn svg {
+               width: 10px;
+               height: 10px;
+               stroke: #222f3e;
+               stroke-width: 2;
+               fill: none;
+               flex: none;
+               transition: transform .15s;
+          }
+
+          .dlg .dsel.open .dsel-btn {
+               border-color: var(--fable-primary, #df3c2b);
+          }
+
+          .dlg .dsel.open .dsel-btn svg {
+               transform: rotate(180deg);
+          }
+
+          .dlg .dsel-list {
+               display: none;
+               position: absolute;
+               top: calc(100% + 4px);
+               inset-inline-start: 0;
+               min-width: 100%;
+               max-height: 220px;
+               overflow-y: auto;
+               background: #fff;
+               border-radius: 8px;
+               box-shadow: 0 6px 20px rgba(34, 47, 62, .18), 0 0 0 1px rgba(34, 47, 62, .08);
+               padding: 4px;
+               z-index: 10;
+          }
+
+          .dlg .dsel.open .dsel-list {
+               display: block;
+          }
+
+          .dlg .dsel-list button {
+               display: block;
+               width: 100%;
+               text-align: start;
+               border: 0;
+               background: none;
+               border-radius: 5px;
+               padding: 7px 10px;
+               font-size: 13.5px;
+               font-family: inherit;
+               color: #222f3e;
+               cursor: pointer;
+          }
+
+          .dlg .dsel-list button:hover {
+               background: #f0f0f0;
+          }
+
+          .dlg .dsel-list button.on {
+               background: color-mix(in srgb, var(--fable-primary, #df3c2b) 12%, #fff);
+               color: var(--fable-primary, #df3c2b);
+               font-weight: 600;
+          }
+
+          .dlg textarea.code-input {
+               width: 560px;
+               max-width: 76vw;
+               height: 220px;
+               font: 13px/1.5 Consolas, 'Courier New', monospace;
+               white-space: pre;
+               direction: ltr;
+               text-align: left;
           }
 
           .dlg .drow {
@@ -1450,7 +1650,8 @@
                color: #222f3e;
                border-radius: 6px;
                padding: 8px 12px;
-               font: 13.5px inherit;
+               font-size: 13.5px;
+               font-family: inherit;
                cursor: pointer;
                white-space: nowrap;
           }

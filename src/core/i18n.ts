@@ -39,9 +39,14 @@ export interface I18nStrings {
   rowabove: string;
   rowbelow: string;
   delrow: string;
+  moverowup: string;
+  moverowdown: string;
   colbefore: string;
   colafter: string;
   delcol: string;
+  movecolleft: string;
+  movecolright: string;
+  cellbg: string;
   deltable: string;
   ltr: string;
   rtl: string;
@@ -159,6 +164,13 @@ export interface I18nStrings {
   vidaltsource: string;
   vidposter: string;
   emoji: string;
+  code: string;
+  codesample: string;
+  codedlgttl: string;
+  codelang: string;
+  editcode: string;
+  deletecode: string;
+  copycode: string;
   chcat_currency: string;
   chcat_text: string;
   chcat_math: string;
@@ -217,9 +229,14 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     rowabove: 'Insert row before',
     rowbelow: 'Insert row after',
     delrow: 'Delete row',
+    moverowup: 'Move row up',
+    moverowdown: 'Move row down',
     colbefore: 'Insert column before',
     colafter: 'Insert column after',
     delcol: 'Delete column',
+    movecolleft: 'Move column left',
+    movecolright: 'Move column right',
+    cellbg: 'Cell background',
     deltable: 'Delete table',
     ltr: 'Left to right',
     rtl: 'Right to left',
@@ -337,6 +354,13 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     vidaltsource: 'Alternative source URL',
     vidposter: 'Media poster (Image URL)',
     emoji: 'Emojis…',
+    code: 'Inline code',
+    codesample: 'Code sample…',
+    codedlgttl: 'Insert/edit code sample',
+    codelang: 'Language',
+    editcode: 'Edit code sample',
+    deletecode: 'Delete code sample',
+    copycode: 'Copy code',
     chcat_currency: 'Currency',
     chcat_text: 'Text & punctuation',
     chcat_math: 'Mathematical',
@@ -393,9 +417,14 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     rowabove: 'إدراج صف قبل',
     rowbelow: 'إدراج صف بعد',
     delrow: 'حذف الصف',
+    moverowup: 'نقل الصف لأعلى',
+    moverowdown: 'نقل الصف لأسفل',
     colbefore: 'إدراج عمود قبل',
     colafter: 'إدراج عمود بعد',
     delcol: 'حذف العمود',
+    movecolleft: 'نقل العمود لليسار',
+    movecolright: 'نقل العمود لليمين',
+    cellbg: 'خلفية الخلية',
     deltable: 'حذف الجدول',
     ltr: 'من اليسار إلى اليمين',
     rtl: 'من اليمين إلى اليسار',
@@ -513,6 +542,13 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     vidaltsource: 'رابط مصدر بديل',
     vidposter: 'صورة الغلاف (رابط الصورة)',
     emoji: 'رموز تعبيرية…',
+    code: 'كود مضمّن',
+    codesample: 'عينة كود…',
+    codedlgttl: 'إدراج/تعديل عينة كود',
+    codelang: 'اللغة',
+    editcode: 'تعديل عينة الكود',
+    deletecode: 'حذف عينة الكود',
+    copycode: 'نسخ الكود',
     chcat_currency: 'عملات',
     chcat_text: 'نص وعلامات ترقيم',
     chcat_math: 'رموز رياضية',
