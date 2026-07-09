@@ -23,6 +23,77 @@ const TPL_ICON: Record<TplLayout, string> = {
     'img-center': IC.tplcenter
 };
 
+/* ---------------------------------------------------------- tooltips
+   One shared bubble + one delegated document listener restyles every native
+   `title` tooltip in the editor UI (toolbar, menus, popups, context toolbars,
+   dialogs) without extra wrapper markup per control. Titles inside the
+   editable area are user content and keep the browser default. */
+const TIP_SCOPE = '.tox,.pop,.tblctx,.imgctx,.selctx,.dlg';
+let tipEl: HTMLDivElement | null = null;
+let tipTarget: HTMLElement | null = null;
+let tipTimer = 0;
+let tipsInstalled = false;
+
+function hideTip(): void {
+    clearTimeout(tipTimer);
+    tipTarget = null;
+    if (tipEl) tipEl.classList.remove('show');
+}
+
+function showTip(el: HTMLElement): void {
+    const text = el.dataset.tip;
+    if (!text) return;
+    tipTarget = el;
+    clearTimeout(tipTimer);
+    // moving along a toolbar re-anchors an already-visible tip almost instantly
+    const delay = tipEl && tipEl.classList.contains('show') ? 60 : 350;
+    tipTimer = window.setTimeout(() => {
+        if (tipTarget !== el || !document.contains(el)) return;
+        if (!tipEl) {
+            tipEl = document.createElement('div');
+            tipEl.className = 'etip';
+            document.body.appendChild(tipEl);
+        }
+        tipEl.textContent = text;
+        tipEl.classList.add('show');
+        const r = el.getBoundingClientRect();
+        const w = tipEl.offsetWidth;
+        const h = tipEl.offsetHeight;
+        let x = r.left + r.width / 2 - w / 2;
+        x = Math.max(6, Math.min(x, innerWidth - w - 6));
+        let y = r.bottom + 7;
+        if (y + h > innerHeight - 6) y = r.top - h - 7;
+        tipEl.style.left = x + 'px';
+        tipEl.style.top = y + 'px';
+    }, delay);
+}
+
+function installTooltips(): void {
+    if (tipsInstalled) return;
+    tipsInstalled = true;
+    document.addEventListener('mouseover', (e) => {
+        const raw = e.target as HTMLElement;
+        const el = raw.closest ? (raw.closest('[title],[data-tip]') as HTMLElement | null) : null;
+        if (!el || !el.closest(TIP_SCOPE) || el.closest('.earea')) {
+            if (el !== tipTarget) hideTip();
+            return;
+        }
+        const title = el.getAttribute('title');
+        if (title) {
+            // hand the text to the custom bubble and disarm the native one
+            el.dataset.tip = title;
+            el.removeAttribute('title');
+            if (!el.getAttribute('aria-label')) el.setAttribute('aria-label', title);
+        }
+        if (el !== tipTarget) showTip(el);
+    });
+    document.addEventListener('mouseout', (e) => {
+        if (tipTarget && !tipTarget.contains(e.relatedTarget as Node)) hideTip();
+    });
+    document.addEventListener('mousedown', hideTip, true);
+    addEventListener('scroll', hideTip, true);
+}
+
 export class FableEditor implements FableEditorApi {
     private static instanceCounter = 0;
 
@@ -204,6 +275,7 @@ export class FableEditor implements FableEditorApi {
             this.shell.appendChild(this.contentStyleEl);
         }
         target.appendChild(this.shell);
+        installTooltips();
 
         if (!this.options.statusbar) this.statusbar.style.display = 'none';
 
@@ -829,14 +901,14 @@ export class FableEditor implements FableEditorApi {
         this.openSubEl = sub;
     }
 
-    private popup(anchor: HTMLElement, build: (el: HTMLElement) => void): void {
+    private popup(anchor: HTMLElement, build: (el: HTMLElement) => void, cls?: string): void {
         if (this.openPop && this.popAnchor === anchor) {
             this.closePop();
             return;
         }
         this.closePop();
         const el = document.createElement('div');
-        el.className = 'pop';
+        el.className = 'pop' + (cls ? ' ' + cls : '');
         el.dir = this.dir();
         build(el);
         document.body.appendChild(el);
@@ -1024,53 +1096,66 @@ export class FableEditor implements FableEditorApi {
         });
     }
 
-    private colorMenu(anchor: HTMLButtonElement, kind: 'fore' | 'back'): void {
-        this.popup(anchor, (el) => {
-            const grid = document.createElement('div');
-            grid.className = 'cpal';
-            COLORS.forEach((c) => {
-                const b = document.createElement('button');
-                b.style.background = c;
-                b.title = c;
-                b.addEventListener('click', () => {
-                    this.closePop();
-                    this.applyColor(kind, c);
-                });
-                grid.appendChild(b);
-            });
-            el.appendChild(grid);
-            el.insertAdjacentHTML('beforeend', '<div class="sep"></div>');
-            const foot = document.createElement('div');
-            foot.className = 'cfoot';
-            const cur = document.createElement('div');
-            cur.className = 'cswatch cur';
-            cur.title = this.t('currentcolor');
-            const curColor = kind === 'fore' ? this.foreColor : this.backColor;
-            cur.style.background = /^#[0-9a-f]{6}$/i.test(curColor) ? curColor : '#000000';
-            cur.innerHTML = IC.check;
-            const nocolor = document.createElement('button');
-            nocolor.type = 'button';
-            nocolor.className = 'cswatch nocolor';
-            nocolor.title = this.t('removecolor');
-            nocolor.addEventListener('click', () => {
+    /** Shared color-picker popup body — swatch grid plus the current-color /
+     *  no-color / custom-picker footer — so the fore/back toolbar menus and the
+     *  table cell-background menu all show the identical popup. */
+    private buildPaletteInto(el: HTMLElement, curColor: string, apply: (c: string | null) => void): void {
+        const grid = document.createElement('div');
+        grid.className = 'cpal';
+        COLORS.forEach((c) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.style.background = c;
+            b.title = c;
+            b.addEventListener('click', () => {
                 this.closePop();
-                this.applyColor(kind, null);
+                apply(c);
             });
-            const wheel = document.createElement('label');
-            wheel.className = 'cswatch cwheel';
-            wheel.title = this.t('customcolor');
-            wheel.innerHTML = IC.palette;
-            const picker = document.createElement('input');
-            picker.type = 'color';
-            picker.value = /^#[0-9a-f]{6}$/i.test(curColor) ? curColor : '#000000';
-            picker.addEventListener('change', () => {
-                this.closePop();
-                this.applyColor(kind, picker.value);
-            });
-            wheel.appendChild(picker);
-            foot.append(cur, nocolor, wheel);
-            el.appendChild(foot);
+            grid.appendChild(b);
         });
+        el.appendChild(grid);
+        el.insertAdjacentHTML('beforeend', '<div class="sep"></div>');
+        const foot = document.createElement('div');
+        foot.className = 'cfoot';
+        const hex = /^#[0-9a-f]{6}$/i.test(curColor) ? curColor : '#000000';
+        const cur = document.createElement('div');
+        cur.className = 'cswatch cur';
+        cur.title = this.t('currentcolor');
+        cur.style.background = hex;
+        cur.innerHTML = IC.check;
+        const nocolor = document.createElement('button');
+        nocolor.type = 'button';
+        nocolor.className = 'cswatch nocolor';
+        nocolor.title = this.t('removecolor');
+        nocolor.addEventListener('click', () => {
+            this.closePop();
+            apply(null);
+        });
+        const wheel = document.createElement('label');
+        wheel.className = 'cswatch cwheel';
+        wheel.title = this.t('customcolor');
+        wheel.innerHTML = IC.palette;
+        const picker = document.createElement('input');
+        picker.type = 'color';
+        picker.value = hex;
+        picker.addEventListener('change', () => {
+            this.closePop();
+            apply(picker.value);
+        });
+        wheel.appendChild(picker);
+        foot.append(cur, nocolor, wheel);
+        el.appendChild(foot);
+    }
+
+    private colorMenu(anchor: HTMLButtonElement, kind: 'fore' | 'back'): void {
+        this.popup(
+            anchor,
+            (el) => {
+                const curColor = kind === 'fore' ? this.foreColor : this.backColor;
+                this.buildPaletteInto(el, curColor, (c) => this.applyColor(kind, c));
+            },
+            kind === 'fore' ? 'pop-forecolor' : 'pop-backcolor'
+        );
     }
 
     private applyColor(kind: 'fore' | 'back', c: string | null): void {
@@ -1856,6 +1941,17 @@ export class FableEditor implements FableEditorApi {
         this.positionCellMarker();
     }
 
+    /** Align the whole table via auto margins — same semantics as the align
+     *  field in the table-properties dialog. */
+    private alignTable(align: 'left' | 'center' | 'right'): void {
+        const table = this.tblActive;
+        if (!table) return;
+        table.style.marginLeft = align === 'left' ? '0' : 'auto';
+        table.style.marginRight = align === 'right' ? '0' : 'auto';
+        this.onChange();
+        this.positionTableHandles();
+    }
+
     /** Color grid applying a background to the caret's cell — the direct way to
      *  build header rows (the toolbar's backcolor highlights text, not cells). */
     private buildCellFillInto(el: HTMLElement): void {
@@ -1868,26 +1964,18 @@ export class FableEditor implements FableEditorApi {
             this.setOrClear(cell, 'background-color', c || '');
             this.onChange();
         };
-        const grid = document.createElement('div');
-        grid.className = 'cpal';
-        COLORS.forEach((c) => {
-            const b = document.createElement('button');
-            b.type = 'button';
-            b.style.background = c;
-            b.title = c;
-            b.addEventListener('click', () => {
-                this.closePop();
-                apply(c);
-            });
-            grid.appendChild(b);
-        });
-        el.appendChild(grid);
-        el.insertAdjacentHTML('beforeend', '<div class="sep"></div>');
-        this.menuItems(el, [{ label: this.t('removecolor'), icon: IC.hric, action: () => apply(null) }]);
+        const cell = this.currentCell();
+        this.buildPaletteInto(el, this.cssToHex(cell ? cell.style.backgroundColor : ''), apply);
+    }
+
+    /** style.backgroundColor reads back as rgb(...) — normalise to #rrggbb for the picker. */
+    private cssToHex(c: string): string {
+        const m = c.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+        return m ? '#' + m.slice(1, 4).map((n) => (+n).toString(16).padStart(2, '0')).join('') : c;
     }
 
     private cellFillMenu(anchor: HTMLElement): void {
-        this.popup(anchor, (el) => this.buildCellFillInto(el));
+        this.popup(anchor, (el) => this.buildCellFillInto(el), 'pop-cellbg');
     }
 
     private applyTableProps(table: HTMLTableElement, vals: Record<string, string>): void {
@@ -3605,6 +3693,10 @@ export class FableEditor implements FableEditorApi {
             hl(this.ctxBtn(IC.movecolleft, this.t('movecolleft'), () => this.tableMove('colleft')), 'col'),
             hl(this.ctxBtn(IC.movecolright, this.t('movecolright'), () => this.tableMove('colright')), 'col'),
             hl(this.ctxBtn(IC.coldelete, this.t('delcol'), () => this.tableOp('delcol')), 'col'),
+            this.ctxSep(),
+            this.ctxBtn(IC.alignleft, this.t('tblalignleft'), () => this.alignTable('left')),
+            this.ctxBtn(IC.aligncenter, this.t('tblaligncenter'), () => this.alignTable('center')),
+            this.ctxBtn(IC.alignright, this.t('tblalignright'), () => this.alignTable('right')),
             this.ctxSep(),
             fillBtn,
             this.ctxBtn(IC.trash, this.t('deltable'), () => this.tableOp('deltable')),
