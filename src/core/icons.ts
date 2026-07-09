@@ -239,6 +239,14 @@ export const IC: Record<string, string> = {
   ),
   emojiic: S(
     '<circle cx="12" cy="12" r="8.5"/><path d="M8.6 14.3a4.6 4.6 0 0 0 6.8 0"/><path d="M9.2 9.6v.7M14.8 9.6v.7"/>'
+  ),
+  inlinecodeic: S('<path d="M8.5 8 4.5 12l4 4M15.5 8l4 4-4 4"/><path d="M13 6l-2 12"/>'),
+  moverowup: S('<rect x="4" y="15.5" width="16" height="5" rx="1"/><path d="M12 12.5V4M8.5 7.5 12 4l3.5 3.5"/>'),
+  moverowdown: S('<rect x="4" y="3.5" width="16" height="5" rx="1"/><path d="M12 11.5V20M8.5 16.5 12 20l3.5-3.5"/>'),
+  movecolleft: S('<rect x="15.5" y="4" width="5" height="16" rx="1"/><path d="M12.5 12H4M7.5 8.5 4 12l3.5 3.5"/>'),
+  movecolright: S('<rect x="3.5" y="4" width="5" height="16" rx="1"/><path d="M11.5 12H20M16.5 8.5 20 12l-3.5 3.5"/>'),
+  codesampleic: S(
+    '<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 8.5h17"/><path d="M9.5 12 7 14.25l2.5 2.25M14.5 12l2.5 2.25-2.5 2.25"/>'
   )
 };
 

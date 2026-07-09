@@ -20,6 +20,8 @@ en:{ dir:'ltr',
   bold:'Bold',italic:'Italic',underline:'Underline',strikethrough:'Strikethrough',
   superscript:'Superscript',subscript:'Subscript',clearformat:'Clear formatting',
   rowabove:'Insert row before',rowbelow:'Insert row after',delrow:'Delete row',
+  moverowup:'Move row up',moverowdown:'Move row down',
+  movecolleft:'Move column left',movecolright:'Move column right',cellbg:'Cell background',
   colbefore:'Insert column before',colafter:'Insert column after',delcol:'Delete column',
   deltable:'Delete table',
   ltr:'Left to right',rtl:'Right to left',
@@ -53,6 +55,8 @@ en:{ dir:'ltr',
   vidsource:'Source',vidembedhint:'Paste your embed code below:',
   vidaltsource:'Alternative source URL',vidposter:'Media poster (Image URL)',
   emoji:'Emojis…',
+  code:'Inline code',codesample:'Code sample…',codedlgttl:'Insert/edit code sample',
+  codelang:'Language',editcode:'Edit code sample',deletecode:'Delete code sample',copycode:'Copy code',
   chcat_currency:'Currency',chcat_text:'Text & punctuation',chcat_math:'Mathematical',
   chcat_arrows:'Arrows',chcat_symbols:'Symbols',chcat_latin:'Extended Latin',chcat_arabic:'Arabic',
   emcat_smileys:'Smileys & emotion',emcat_people:'People & body',emcat_animals:'Animals & nature',
@@ -70,6 +74,8 @@ ar:{ dir:'rtl',
   bold:'غامق',italic:'مائل',underline:'تسطير',strikethrough:'يتوسطه خط',
   superscript:'نص مرتفع',subscript:'نص منخفض',clearformat:'مسح التنسيق',
   rowabove:'إدراج صف قبل',rowbelow:'إدراج صف بعد',delrow:'حذف الصف',
+  moverowup:'نقل الصف لأعلى',moverowdown:'نقل الصف لأسفل',
+  movecolleft:'نقل العمود لليسار',movecolright:'نقل العمود لليمين',cellbg:'خلفية الخلية',
   colbefore:'إدراج عمود قبل',colafter:'إدراج عمود بعد',delcol:'حذف العمود',
   deltable:'حذف الجدول',
   ltr:'من اليسار إلى اليمين',rtl:'من اليمين إلى اليسار',
@@ -103,6 +109,8 @@ ar:{ dir:'rtl',
   vidsource:'المصدر',vidembedhint:'الصق كود التضمين أدناه:',
   vidaltsource:'رابط مصدر بديل',vidposter:'صورة الغلاف (رابط الصورة)',
   emoji:'رموز تعبيرية…',
+  code:'كود مضمّن',codesample:'عينة كود…',codedlgttl:'إدراج/تعديل عينة كود',
+  codelang:'اللغة',editcode:'تعديل عينة الكود',deletecode:'حذف عينة الكود',copycode:'نسخ الكود',
   chcat_currency:'عملات',chcat_text:'نص وعلامات ترقيم',chcat_math:'رموز رياضية',
   chcat_arrows:'أسهم',chcat_symbols:'رموز',chcat_latin:'لاتينية موسعة',chcat_arabic:'عربية',
   emcat_smileys:'وجوه ومشاعر',emcat_people:'أشخاص وإيماءات',emcat_animals:'حيوانات وطبيعة',
@@ -160,6 +168,14 @@ const EMOJI_CATEGORIES = [
  {key:'emcat_flags',chars:['🏁','🚩','🎌','🏴','🏳','🇦🇪','🇸🇦','🇶🇦','🇰🇼','🇧🇭','🇴🇲','🇪🇬','🇯🇴','🇱🇧','🇮🇳','🇵🇰','🇺🇸','🇬🇧','🇨🇦','🇦🇺','🇫🇷','🇩🇪','🇮🇹','🇪🇸','🇵🇹','🇳🇱','🇧🇪','🇨🇭','🇸🇪','🇳🇴','🇩🇰','🇫🇮','🇮🇪','🇬🇷','🇹🇷','🇷🇺','🇺🇦','🇵🇱','🇯🇵','🇰🇷','🇨🇳','🇸🇬','🇲🇾','🇮🇩','🇹🇭','🇵🇭','🇻🇳','🇧🇷','🇦🇷','🇲🇽','🇿🇦','🇳🇬','🇰🇪','🇲🇦']}
 ];
 
+/* code-sample dialog languages: [value stored in data-lang, label] */
+const CODE_LANGS = [
+ ['plain','Plain text'],['html','HTML/XML'],['css','CSS'],['javascript','JavaScript'],
+ ['typescript','TypeScript'],['json','JSON'],['python','Python'],['java','Java'],
+ ['csharp','C#'],['cpp','C/C++'],['php','PHP'],['ruby','Ruby'],['go','Go'],
+ ['rust','Rust'],['sql','SQL'],['bash','Bash/Shell']
+];
+
 /* ---------------------------------------------------------- icons */
 const S = (inner,vb) => `<svg viewBox="${vb||'0 0 24 24'}">${inner}</svg>`;
 const IC = {
@@ -204,6 +220,11 @@ const IC = {
  colbefore:S('<rect x="12" y="4" width="7" height="16" rx="1"/><path d="M2 12h7M6 8.5l-3.5 3.5L6 15.5"/>'),
  colafter:S('<rect x="5" y="4" width="7" height="16" rx="1"/><path d="M15 12h7M18 8.5l3.5 3.5L18 15.5"/>'),
  coldelete:S('<rect x="8.5" y="4" width="7" height="16" rx="1"/><path d="M10.3 8.5l3.4 7M10.3 15.5l3.4-7"/>'),
+ moverowup:S('<rect x="4" y="15.5" width="16" height="5" rx="1"/><path d="M12 12.5V4M8.5 7.5 12 4l3.5 3.5"/>'),
+ moverowdown:S('<rect x="4" y="3.5" width="16" height="5" rx="1"/><path d="M12 11.5V20M8.5 16.5 12 20l3.5-3.5"/>'),
+ movecolleft:S('<rect x="15.5" y="4" width="5" height="16" rx="1"/><path d="M12.5 12H4M7.5 8.5 4 12l3.5 3.5"/>'),
+ movecolright:S('<rect x="3.5" y="4" width="5" height="16" rx="1"/><path d="M11.5 12H20M16.5 8.5 20 12l-3.5 3.5"/>'),
+ palette:S('<path d="M12 3a9 9 0 1 0 0 18h1.2a2 2 0 0 0 2-2 2 2 0 0 1 2-2H18a3 3 0 0 0 3-3c0-6.1-4.5-11-9-11z"/><circle class="f" cx="7.8" cy="10.2" r="1.3"/><circle class="f" cx="11.6" cy="7.3" r="1.3"/><circle class="f" cx="15.8" cy="9.6" r="1.3"/><circle class="f" cx="9" cy="14.8" r="1.3"/>'),
  tabledelete:S('<rect x="4" y="5" width="16" height="14" rx="1.5"/><path d="M4 10h16M4 14.5h16M9.5 5v14M14.5 5v14"/><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke-width="2.1"/>'),
  trash:S('<path d="M5 7h14M10 7V5h4v2M7.5 7l1 13h7l1-13"/>'),
  templateic:S('<rect x="4" y="4" width="16" height="16" rx="1.5"/><rect x="6.5" y="6.5" width="5" height="5" rx=".5"/><path d="M14 7.5h3.5M14 10h3.5M6.5 14h11M6.5 17h11"/>'),
@@ -213,7 +234,9 @@ const IC = {
  tplcenter:S('<path d="M3 4h18M3 7h18M3 10h12"/><rect x="5" y="12.5" width="14" height="9" rx=".8"/>'),
  video:S('<rect x="3" y="6" width="13" height="12" rx="1.5"/><path d="M17 10l4-2.5v9L17 14z"/>'),
  editic:S('<path d="M4 20l1-4.5L15.5 5 19 8.5 8.5 19 4 20z"/><path d="M13.5 6.5l4 4"/>'),
- emojiic:S('<circle cx="12" cy="12" r="8.5"/><path d="M8.6 14.3a4.6 4.6 0 0 0 6.8 0"/><path d="M9.2 9.6v.7M14.8 9.6v.7"/>')
+ emojiic:S('<circle cx="12" cy="12" r="8.5"/><path d="M8.6 14.3a4.6 4.6 0 0 0 6.8 0"/><path d="M9.2 9.6v.7M14.8 9.6v.7"/>'),
+ inlinecodeic:S('<path d="M8.5 8 4.5 12l4 4M15.5 8l4 4-4 4"/><path d="M13 6l-2 12"/>'),
+ codesampleic:S('<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 8.5h17"/><path d="M9.5 12 7 14.25l2.5 2.25M14.5 12l2.5 2.25-2.5 2.25"/>')
 };
 const TXT = (html)=>`<span class="txt">${html}</span>`;
 
@@ -454,7 +477,8 @@ function buildToolbar(){
     group( tbtn(TXT('<b class="sans">B</b>'),t('bold'),()=>exec('bold'),'bold'),
            tbtn(TXT('<i>I</i>'),t('italic'),()=>exec('italic'),'italic'),
            tbtn(TXT('<u class="sans" style="font-weight:400">U</u>'),t('underline'),()=>exec('underline'),'underline'),
-           tbtn(TXT('<s class="sans" style="font-weight:400">S</s>'),t('strikethrough'),()=>exec('strikeThrough'),'strikeThrough') ),
+           tbtn(TXT('<s class="sans" style="font-weight:400">S</s>'),t('strikethrough'),()=>exec('strikeThrough'),'strikeThrough'),
+           tbtn(IC.inlinecodeic,t('code'),toggleInlineCode,'code') ),
     group( tbtn(IC.alignleft,t('alignleft'),()=>exec('justifyLeft'),'justifyLeft'),
            tbtn(IC.aligncenter,t('aligncenter'),()=>exec('justifyCenter'),'justifyCenter'),
            tbtn(IC.alignright,t('alignright'),()=>exec('justifyRight'),'justifyRight'),
@@ -489,14 +513,43 @@ function buildToolbar(){
         {label:t('quicktable'),icon:IC.tableic,action:()=>tableGrid(btn)},
         {label:t('template'),icon:IC.templateic,action:()=>templateMenu(btn)},
         {label:t('charmap'),icon:IC.charic,action:()=>charMap()},
-        {label:t('emoji'),icon:IC.emojiic,action:()=>emojiMap()}
+        {label:t('emoji'),icon:IC.emojiic,action:()=>emojiMap()},
+        {label:t('codesample'),icon:IC.codesampleic,action:()=>codeDlg()}
       ]));
     }) )
   );
   /* restore colorbars */
   document.querySelectorAll('[data-cb=fore]').forEach(e=>e.style.background=foreColor);
   document.querySelectorAll('[data-cb=back]').forEach(e=>e.style.background=backColor);
+  tbrMore = tbtn(IC.more, t('more'), ()=>{ tbrExpanded=!tbrExpanded; updateToolbarOverflow(); });
+  tbrMore.classList.add('tbr-more');
+  toolbar.appendChild(tbrMore);
+  updateToolbarOverflow();
 }
+
+/* responsive one-line toolbar: when the controls overflow a single row
+   (mobile/tablet, or a narrow container) the toolbar clips to one row and
+   shows a trailing … button that expands the full set */
+let tbrMore=null, tbrExpanded=false;
+function updateToolbarOverflow(){
+  if(!tbrMore) return;
+  toolbar.classList.add('tbr-measure');
+  const overflows = toolbar.scrollWidth > toolbar.clientWidth + 1;
+  toolbar.classList.remove('tbr-measure');
+  /* only xs/sm/md editors collapse; at lg widths and up the toolbar wraps as before */
+  const narrow = shell.offsetWidth < 992;
+  if(!overflows || !narrow){
+    tbrExpanded=false;
+    toolbar.classList.remove('collapsible','expanded');
+    tbrMore.classList.remove('on');
+    return;
+  }
+  toolbar.classList.add('collapsible');
+  toolbar.classList.toggle('expanded', tbrExpanded);
+  tbrMore.classList.toggle('on', tbrExpanded);
+}
+window.addEventListener('resize', updateToolbarOverflow);
+if(typeof ResizeObserver!=='undefined') new ResizeObserver(updateToolbarOverflow).observe(shell);
 
 /* ---------------------------------------------------------- menubar */
 function mItem(label,icon,action,shortcut){ return {label:t(label),icon,action,shortcut}; }
@@ -519,6 +572,7 @@ function buildMenubar(){
     insert:[ mItem('image',IC.image,insertImagePlaceholder),
            mItem('video',IC.video,()=>videoDlg()),
            {label:t('inserttable'),icon:IC.tableic,action:()=>tableGrid(menubar.children[6]||menubar)},
+           mItem('codesample',IC.codesampleic,()=>codeDlg()),
            {label:t('template'),icon:IC.templateic,action:()=>templateMenu(menubar.children[3]||menubar)},
            mItem('hr',IC.hric,()=>exec('insertHorizontalRule')), '|',
            mItem('charmap',IC.charic,a=>charMap()),
@@ -533,17 +587,23 @@ function buildMenubar(){
            mItem('underline',null,()=>exec('underline'),'Ctrl+U'),
            mItem('strikethrough',null,()=>exec('strikeThrough')),
            mItem('superscript',null,()=>exec('superscript')),
-           mItem('subscript',null,()=>exec('subscript')), '|',
+           mItem('subscript',null,()=>exec('subscript')),
+           mItem('code',IC.inlinecodeic,toggleInlineCode), '|',
            mItem('clearformat',null,()=>exec('removeFormat')) ],
     tools:[ mItem('sourcecode',IC.srcic,sourceDlg),
            mItem('wordcount',IC.wcic,wordCountDlg) ],
     table:[ {label:t('inserttable'),icon:IC.tableic,action:()=>tableGrid(menubar.children[6]||menubar)}, '|',
            mItem('rowabove',null,()=>tableOp('rowabove')),
            mItem('rowbelow',null,()=>tableOp('rowbelow')),
+           mItem('moverowup',IC.moverowup,()=>tableMove('rowup')),
+           mItem('moverowdown',IC.moverowdown,()=>tableMove('rowdown')),
            mItem('delrow',null,()=>tableOp('delrow')), '|',
            mItem('colbefore',null,()=>tableOp('colbefore')),
            mItem('colafter',null,()=>tableOp('colafter')),
+           mItem('movecolleft',IC.movecolleft,()=>tableMove('colleft')),
+           mItem('movecolright',IC.movecolright,()=>tableMove('colright')),
            mItem('delcol',null,()=>tableOp('delcol')), '|',
+           mItem('cellbg',IC.palette,()=>cellFillMenu(menubar.children[6]||menubar)), '|',
            mItem('deltable',null,()=>tableOp('deltable')) ],
     help:[ mItem('helpttl',IC.helpic,helpDlg,'Alt+0') ]
   };
@@ -596,6 +656,59 @@ function tableOp(op){
   onChange();
   positionTableHandles();
 }
+
+/* reorders the current row/column; the caret travels with the moved cell so
+   the move buttons can be clicked repeatedly to walk it along */
+function tableMove(op){
+  restoreSel();
+  const cell=currentCell();
+  if(!cell) return;
+  const row=cell.parentElement, table=cell.closest('table');
+  const idx=[...row.children].indexOf(cell);
+  if(op==='rowup'){ const prev=row.previousElementSibling; if(prev) prev.before(row); }
+  if(op==='rowdown'){ const next=row.nextElementSibling; if(next) next.after(row); }
+  if(op==='colleft' && idx>0)
+    table.querySelectorAll('tr').forEach(tr=>{
+      const c=tr.children[idx], prev=tr.children[idx-1];
+      if(c&&prev) prev.before(c);
+    });
+  if(op==='colright')
+    table.querySelectorAll('tr').forEach(tr=>{
+      const c=tr.children[idx], next=tr.children[idx+1];
+      if(c&&next) next.after(c);
+    });
+  /* moving a node resets live ranges inside it — put the caret back */
+  const range=document.createRange();
+  range.selectNodeContents(cell);
+  range.collapse(true);
+  const s=window.getSelection();
+  if(s){ s.removeAllRanges(); s.addRange(range); }
+  saveSel(); onChange();
+  positionTableHandles(); positionCellMarker();
+}
+
+/* color grid applying a background to the caret's cell — the direct way to
+   build header rows (the toolbar backcolor highlights text, not cells) */
+function buildCellFillInto(el){
+  const apply=c=>{
+    const cell=currentCell();
+    if(!cell){ alert(t('nocell')); return; }
+    if(c) cell.style.backgroundColor=c;
+    else cell.style.removeProperty('background-color');
+    onChange();
+  };
+  const grid=document.createElement('div'); grid.className='cpal';
+  COLORS.forEach(c=>{
+    const b=document.createElement('button');
+    b.type='button'; b.style.background=c; b.title=c;
+    b.addEventListener('click', ()=>{ closePop(); apply(c); });
+    grid.appendChild(b);
+  });
+  el.appendChild(grid);
+  el.insertAdjacentHTML('beforeend','<div class="sep"></div>');
+  menuItems(el,[{label:t('removecolor'),icon:IC.hric,action:()=>apply(null)}]);
+}
+function cellFillMenu(anchor){ popup(anchor, buildCellFillInto); }
 
 function applyTableProps(table, vals){
   if(vals.width) table.style.width = /^\d+$/.test(vals.width) ? vals.width+'px' : vals.width;
@@ -1277,6 +1390,209 @@ ed.addEventListener('input', positionEmbedCtx);
 
 /* ---------------------------------------------------------- html attr escaping */
 function escapeAttr(s){ return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ---------------------------------------------------------- inline code & code samples */
+/* the inline <code> run the caret sits in, if any (code blocks don't count) */
+function closestInlineCode(){
+  const s=window.getSelection();
+  const node=s && ed.contains(s.anchorNode) ? s.anchorNode : null;
+  if(!node) return null;
+  const el=node.nodeType===1 ? node : node.parentElement;
+  const code=el && el.closest('code');
+  return code && ed.contains(code) && !code.closest('pre') ? code : null;
+}
+/* wraps the selection in an inline <code>, or unwraps the run the caret is in */
+function toggleInlineCode(){
+  restoreSel();
+  const sel=window.getSelection();
+  if(!sel || !sel.rangeCount) return;
+  const existing=closestInlineCode();
+  if(existing){
+    const first=existing.firstChild, last=existing.lastChild;
+    while(existing.firstChild) existing.parentNode.insertBefore(existing.firstChild, existing);
+    existing.remove();
+    if(first && last){
+      const r=document.createRange();
+      r.setStartBefore(first); r.setEndAfter(last);
+      sel.removeAllRanges(); sel.addRange(r);
+    }
+  }else{
+    const range=sel.getRangeAt(0);
+    if(range.collapsed) return;
+    if(closestBlock(range.startContainer)!==closestBlock(range.endContainer)) return;
+    const code=document.createElement('code');
+    code.appendChild(range.extractContents());
+    range.insertNode(code);
+    const r=document.createRange();
+    r.selectNodeContents(code);
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+  saveSel(); refreshState(); onChange();
+}
+/* typing `snippet` converts to inline <code> when the closing backtick is typed */
+function tryCodeTyping(e){
+  const sel=window.getSelection();
+  if(!sel || !sel.isCollapsed || !sel.anchorNode) return;
+  const node=sel.anchorNode;
+  if(node.nodeType!==3 || !ed.contains(node)) return;
+  if(node.parentElement && node.parentElement.closest('code, pre')) return;
+  const before=(node.textContent||'').slice(0, sel.anchorOffset);
+  const m=before.match(/(?:^|[^`])`([^`]+)$/);
+  if(!m) return;
+  const src=m[1];
+  if(/^\s|\s$/.test(src)) return;
+  e.preventDefault();
+  const range=document.createRange();
+  range.setStart(node, sel.anchorOffset - src.length - 1);
+  range.setEnd(node, sel.anchorOffset);
+  /* direct DOM instead of execCommand(insertHTML) — with styleWithCSS active
+     the browser rewrites a pasted <code> into a styled <span> */
+  range.deleteContents();
+  const code=document.createElement('code');
+  code.textContent=src;
+  range.insertNode(code);
+  const after=document.createRange();
+  after.setStartAfter(code);
+  after.collapse(true);
+  sel.removeAllRanges(); sel.addRange(after);
+  saveSel(); onChange();
+}
+ed.addEventListener('keydown', e=>{
+  if(e.key==='`' && !e.ctrlKey && !e.metaKey && !e.altKey) tryCodeTyping(e);
+});
+/* custom dropdown for dialog fields (a native <select> popup can't be styled):
+   a field-styled button showing the current choice + a floating option list */
+function dlgSelect(options, selected){
+  let value=selected;
+  const el=document.createElement('div'); el.className='dsel';
+  const btn=document.createElement('button'); btn.type='button'; btn.className='dsel-btn';
+  const lbl=document.createElement('span'); lbl.className='lbl';
+  const init=options.find(([v])=>v===selected);
+  lbl.textContent=init?init[1]:'';
+  btn.append(lbl);
+  btn.insertAdjacentHTML('beforeend', IC.chev);
+  const list=document.createElement('div'); list.className='dsel-list';
+  options.forEach(([v,label])=>{
+    const o=document.createElement('button'); o.type='button'; o.textContent=label;
+    o.classList.toggle('on', v===value);
+    o.addEventListener('click', ()=>{
+      value=v; lbl.textContent=label;
+      list.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===o));
+      el.classList.remove('open');
+      btn.focus();
+    });
+    list.appendChild(o);
+  });
+  btn.addEventListener('click', ()=>{
+    el.classList.toggle('open');
+    if(el.classList.contains('open')) list.querySelector('.on')?.scrollIntoView({block:'nearest'});
+  });
+  el.addEventListener('focusout', e=>{
+    if(!el.contains(e.relatedTarget)) el.classList.remove('open');
+  });
+  el.addEventListener('keydown', e=>{
+    /* Escape closes the open list without closing the whole dialog */
+    if(e.key==='Escape' && el.classList.contains('open')){
+      e.stopPropagation(); el.classList.remove('open'); btn.focus();
+    }
+  });
+  el.append(btn, list);
+  return { el, value: ()=>value };
+}
+/* insert/edit-code-sample dialog: language dropdown + monospace textarea */
+function codeDlg(existing){
+  saveSel();
+  let langDd, ta;
+  dialog(t('codedlgttl'), body=>{
+    const f=document.createElement('div'); f.className='dfield';
+    const l=document.createElement('label'); l.textContent=t('codelang');
+    langDd=dlgSelect(CODE_LANGS, (existing&&existing.dataset.lang)||'plain');
+    f.append(l, langDd.el);
+    ta=document.createElement('textarea');
+    ta.className='code-input'; ta.spellcheck=false;
+    ta.value=(existing&&existing.querySelector('code')&&existing.querySelector('code').textContent)||'';
+    ta.placeholder='const answer = 42;';
+    body.append(f, ta);
+    setTimeout(()=>ta.focus(), 0);
+  },[
+    {label:t('cancel'),action:closeDlg},
+    {label:t('save'),pri:true,action:()=>{
+      const src=ta.value.replace(/\s+$/,'');
+      const lang=langDd.value();
+      const found=CODE_LANGS.find(([v])=>v===lang);
+      const label=found?found[1]:lang;
+      closeDlg();
+      if(!src.trim()) return;
+      if(existing){
+        existing.dataset.lang=lang;
+        existing.setAttribute('data-lang-label',label);
+        (existing.querySelector('code')||existing).textContent=src;
+        clearCodeSel(); onChange();
+        return;
+      }
+      restoreSel();
+      document.execCommand('insertHTML', false,
+        `<pre class="code-block" contenteditable="false" data-lang="${lang}" data-lang-label="${escapeAttr(label)}"><code>${escHtml(src)}</code></pre><p><br></p>`);
+      onChange();
+    }}
+  ]);
+}
+/* selecting a code block shows an edit / copy / delete toolbar */
+let codeActive=null, codeCtx=null;
+function clearCodeSel(){
+  codeCtx?.remove(); codeCtx=null;
+  codeActive?.classList.remove('code-selected'); codeActive=null;
+}
+function copyCodeBlock(el){
+  const c=el.querySelector('code');
+  const text=(c?c.textContent:el.textContent)||'';
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).catch(()=>{}); return; }
+  const tmp=document.createElement('textarea');
+  tmp.value=text; document.body.appendChild(tmp); tmp.select();
+  document.execCommand('copy'); tmp.remove();
+}
+function selectCodeEl(el){
+  if(codeActive===el) return;
+  clearCodeSel();
+  codeActive=el; el.classList.add('code-selected');
+  codeCtx=document.createElement('div');
+  codeCtx.className='tblctx img-ph-ctx'; codeCtx.dir=t('dir');
+  codeCtx.append(
+    ctxBtn(IC.editic, t('editcode'), ()=>codeDlg(el)),
+    ctxBtn(IC.copyic, t('copycode'), ()=>copyCodeBlock(el)),
+    ctxSep(),
+    ctxBtn(IC.trash, t('deletecode'), ()=>{ el.remove(); clearCodeSel(); onChange(); })
+  );
+  document.body.appendChild(codeCtx);
+  positionCodeCtx();
+}
+function positionCodeCtx(){
+  if(!codeActive || !document.body.contains(codeActive)){ clearCodeSel(); return; }
+  if(!codeCtx) return;
+  const r=codeActive.getBoundingClientRect();
+  const cw=codeCtx.offsetWidth, ch=codeCtx.offsetHeight;
+  let cx=r.left+scrollX+(r.width-cw)/2;
+  cx=Math.max(8+scrollX, Math.min(cx, scrollX+innerWidth-cw-8));
+  let cy=r.top+scrollY-ch-8;
+  if(cy<scrollY+4) cy=r.bottom+scrollY+8;
+  codeCtx.style.left=cx+'px';
+  codeCtx.style.top=cy+'px';
+}
+ed.addEventListener('mousedown', e=>{
+  const el = e.target.closest && e.target.closest('pre.code-block');
+  if(el && ed.contains(el)){ e.preventDefault(); selectCodeEl(el); }
+  else clearCodeSel();
+});
+document.addEventListener('mousedown', e=>{
+  if(!codeActive) return;
+  if(ed.contains(e.target) || (codeCtx && codeCtx.contains(e.target))) return;
+  clearCodeSel();
+});
+ed.addEventListener('scroll', positionCodeCtx);
+window.addEventListener('scroll', positionCodeCtx, true);
+window.addEventListener('resize', positionCodeCtx);
+ed.addEventListener('input', positionCodeCtx);
 /* ---------------------------------------------------------- templates */
 const TPL_LAYOUTS=['img-left','img-right','img-top','img-center'];
 const TPL_LABEL={'img-left':'tplimgleft','img-right':'tplimgright','img-top':'tplimgtop','img-center':'tplimgcenter'};
@@ -1482,6 +1798,7 @@ function ctxBtn(icon, tip, fn){
 function ctxSep(){ const s=document.createElement('div'); s.className='sep'; return s; }
 function buildTableCtxToolbar(){
   const el=document.createElement('div'); el.className='tblctx'; el.dir=t('dir');
+  const fillBtn=ctxBtn(IC.palette, t('cellbg'), ()=>cellFillMenu(fillBtn));
   /* hovering a row/column button highlights the row/column it targets */
   const hl=(b,kind)=>{
     b.addEventListener('mouseenter', ()=>setOpTarget(kind));
@@ -1491,12 +1808,17 @@ function buildTableCtxToolbar(){
   el.append(
     hl(ctxBtn(IC.rowbefore, t('rowabove'), ()=>tableOp('rowabove')),'row'),
     hl(ctxBtn(IC.rowafter, t('rowbelow'), ()=>tableOp('rowbelow')),'row'),
+    hl(ctxBtn(IC.moverowup, t('moverowup'), ()=>tableMove('rowup')),'row'),
+    hl(ctxBtn(IC.moverowdown, t('moverowdown'), ()=>tableMove('rowdown')),'row'),
     hl(ctxBtn(IC.rowdelete, t('delrow'), ()=>tableOp('delrow')),'row'),
     ctxSep(),
     hl(ctxBtn(IC.colbefore, t('colbefore'), ()=>tableOp('colbefore')),'col'),
     hl(ctxBtn(IC.colafter, t('colafter'), ()=>tableOp('colafter')),'col'),
+    hl(ctxBtn(IC.movecolleft, t('movecolleft'), ()=>tableMove('colleft')),'col'),
+    hl(ctxBtn(IC.movecolright, t('movecolright'), ()=>tableMove('colright')),'col'),
     hl(ctxBtn(IC.coldelete, t('delcol'), ()=>tableOp('delcol')),'col'),
     ctxSep(),
+    fillBtn,
     ctxBtn(IC.trash, t('deltable'), ()=>tableOp('deltable')),
     ctxBtn(IC.tableic, t('tablepropsttl'), ()=>tablePropsDlg())
   );
@@ -1651,6 +1973,7 @@ function refreshState(){
    });
   const blk=closestBlock(window.getSelection().anchorNode);
   const dir = blk?.closest('[dir]')?.getAttribute('dir') || ed.getAttribute('dir') || t('dir');
+  toolbar.querySelector('[data-id=code]')?.classList.toggle('on', inEd && !!closestInlineCode());
   toolbar.querySelector('[data-id=ltr]')?.classList.toggle('on', inEd&&dir==='ltr');
   toolbar.querySelector('[data-id=rtl]')?.classList.toggle('on', inEd&&dir==='rtl');
   const setLbl=(id,val,def)=>{

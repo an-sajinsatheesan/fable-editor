@@ -1,6 +1,6 @@
 import { EditorInitOptions, EditorLanguage, FableEditorApi, MenuItemDef, DialogButton } from './types';
 import { getStrings, I18nStrings } from './i18n';
-import { FONTS, SIZES, BLOCKS, COLORS, QUICK_COLORS, CHAR_CATEGORIES, EMOJI_CATEGORIES, GlyphCategory, MIN_FONT_PX, MAX_FONT_PX, LINE_HEIGHTS, WORD_SPACINGS, LETTER_SPACINGS, DEFAULT_TOOLBAR, DEFAULT_MENUBAR } from './config';
+import { FONTS, SIZES, BLOCKS, COLORS, QUICK_COLORS, CHAR_CATEGORIES, EMOJI_CATEGORIES, GlyphCategory, MIN_FONT_PX, MAX_FONT_PX, LINE_HEIGHTS, WORD_SPACINGS, LETTER_SPACINGS, CODE_LANGS, DEFAULT_TOOLBAR, DEFAULT_MENUBAR } from './config';
 import { IC } from './icons';
 import { cleanPastedHTML, normalizeTextPaste } from './paste-engine';
 import { importDocxToHtml } from './docx-import';
@@ -94,6 +94,12 @@ export class FableEditor implements FableEditorApi {
     private onVideoUploadError?: (error: unknown, file: File) => void;
 
     private selCtx: HTMLElement | null = null;
+
+    private tbrMore: HTMLButtonElement | null = null;
+    private tbrExpanded = false;
+
+    private codeActive: HTMLElement | null = null;
+    private codeCtx: HTMLElement | null = null;
 
     private tplActive: HTMLElement | null = null;
     private tplCtx: HTMLElement | null = null;
@@ -298,6 +304,7 @@ export class FableEditor implements FableEditorApi {
             this.positionTplCtx();
             this.positionVphCtx();
             this.positionVidCtx();
+            this.positionCodeCtx();
         });
         this.on(this.ed, 'keydown', (e: KeyboardEvent) => {
             if (e.altKey && e.key === '0') {
@@ -312,6 +319,7 @@ export class FableEditor implements FableEditorApi {
                 e.preventDefault();
                 this.removeVphPlaceholder();
             }
+            if (e.key === '`' && !e.ctrlKey && !e.metaKey && !e.altKey) this.tryCodeTyping(e);
         });
         this.on(this.ed, 'paste', (e: ClipboardEvent) => this.handlePaste(e));
         this.on(this.ed, 'drop', (e: DragEvent) => {
@@ -356,6 +364,13 @@ export class FableEditor implements FableEditorApi {
             const tpl = target.closest?.('.tpl') as HTMLElement | null;
             if (tpl && this.ed.contains(tpl) && !this.options.readonly) this.selectTemplate(tpl);
             else this.clearTplSel();
+            const codeBlk = target.closest?.('pre.code-block') as HTMLElement | null;
+            if (codeBlk && this.ed.contains(codeBlk) && !this.options.readonly) {
+                e.preventDefault();
+                this.selectCodeEl(codeBlk);
+            } else {
+                this.clearCodeSel();
+            }
             const img = target.closest?.('img') as HTMLImageElement | null;
             if (img && this.ed.contains(img) && !this.options.readonly) {
                 e.preventDefault();
@@ -399,6 +414,7 @@ export class FableEditor implements FableEditorApi {
             this.positionTplCtx();
             this.positionVphCtx();
             this.positionVidCtx();
+            this.positionCodeCtx();
         });
         this.onWin(
             'scroll',
@@ -409,6 +425,7 @@ export class FableEditor implements FableEditorApi {
                 this.positionTplCtx();
                 this.positionVphCtx();
                 this.positionVidCtx();
+                this.positionCodeCtx();
                 this.repositionSelToolbar();
             },
             true
@@ -420,8 +437,17 @@ export class FableEditor implements FableEditorApi {
             this.positionTplCtx();
             this.positionVphCtx();
             this.positionVidCtx();
+            this.positionCodeCtx();
             this.repositionSelToolbar();
+            this.updateToolbarOverflow();
         });
+        /* container-driven, not just viewport-driven: an editor inside a resizable
+           panel collapses/expands its toolbar as its own width changes */
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(() => this.updateToolbarOverflow());
+            ro.observe(this.shell);
+            this.listeners.push(() => ro.disconnect());
+        }
 
         this.on(this.imgInput, 'change', () => {
             const file = this.imgInput.files?.[0];
@@ -486,6 +512,7 @@ export class FableEditor implements FableEditorApi {
                 (this.selCtx && this.selCtx.contains(e.target as Node)) ||
                 (this.vphCtx && this.vphCtx.contains(e.target as Node)) ||
                 (this.vidCtx && this.vidCtx.contains(e.target as Node)) ||
+                (this.codeCtx && this.codeCtx.contains(e.target as Node)) ||
                 (this.openPop && this.openPop.contains(e.target as Node)) ||
                 (this.openSubEl && this.openSubEl.contains(e.target as Node))
             )
@@ -496,6 +523,7 @@ export class FableEditor implements FableEditorApi {
             this.clearTplSel();
             this.clearVphPlaceholderSel();
             this.clearVidHandles();
+            this.clearCodeSel();
             this.clearSelToolbar();
         });
     }
@@ -537,6 +565,7 @@ export class FableEditor implements FableEditorApi {
         this.clearTplSel();
         this.clearVphPlaceholderSel();
         this.clearVidHandles();
+        this.clearCodeSel();
         this.clearSelToolbar();
         this.onChange();
     }
@@ -601,6 +630,7 @@ export class FableEditor implements FableEditorApi {
         this.clearTplSel();
         this.clearVphPlaceholderSel();
         this.clearVidHandles();
+        this.clearCodeSel();
         this.clearSelToolbar();
         this.listeners.forEach((fn) => fn());
         this.listeners = [];
@@ -1477,6 +1507,8 @@ export class FableEditor implements FableEditorApi {
             indent: () => this.tbtn(IC.indent, this.t('indent'), () => this.exec('indent')),
             link: () => this.tbtn(IC.link, this.t('linkttl'), () => this.linkDlg()),
             blockquote: () => this.tbtn(IC.quote, this.t('quote'), () => this.toggleBlock('blockquote'), 'blockquote'),
+            code: () => this.tbtn(IC.inlinecodeic, this.t('code'), () => this.toggleInlineCode(), 'code'),
+            codesample: () => this.tbtn(IC.codesampleic, this.t('codesample'), () => this.codeDlg()),
             changecase: () => this.menuTbtn(IC.caseic, this.t('changecase'), (b) => this.caseMenu(b)),
             lineheight: () => this.menuTbtn(IC.lineheight, this.t('lineheight'), (b) => this.lineHeightMenu(b)),
             wordspacing: () => this.menuTbtn(IC.wordspacing, this.t('wordspacing'), (b) => this.wordSpacingMenu(b)),
@@ -1521,7 +1553,41 @@ export class FableEditor implements FableEditorApi {
             });
             if (elements.length) this.toolbar.appendChild(this.group(...elements));
         });
+        this.tbrMore = this.tbtn(IC.more, this.t('more'), () => {
+            this.tbrExpanded = !this.tbrExpanded;
+            this.updateToolbarOverflow();
+        });
+        this.tbrMore.classList.add('tbr-more');
+        this.toolbar.appendChild(this.tbrMore);
         this.syncColorSwatches(this.toolbar);
+        this.updateToolbarOverflow();
+    }
+
+    /** xs/sm/md editors (< 992px wide) collapse an overflowing toolbar to one row +
+     *  "…" expander; at lg widths and up the toolbar wraps to multiple rows as before. */
+    private static readonly TBR_COLLAPSE_MAX = 992;
+
+    /** Responsive one-line toolbar: on mobile/tablet widths (or a narrow host
+     *  container) a toolbar that can't fit on a single row collapses to one
+     *  clipped row plus a trailing "…" button that expands/collapses the full
+     *  set. Driven by the editor's own width, so it also applies to narrow
+     *  panels on desktop. */
+    private updateToolbarOverflow(): void {
+        const tb = this.toolbar;
+        if (!this.tbrMore) return;
+        tb.classList.add('tbr-measure');
+        const overflows = tb.scrollWidth > tb.clientWidth + 1;
+        tb.classList.remove('tbr-measure');
+        const narrow = this.shell.offsetWidth < FableEditor.TBR_COLLAPSE_MAX;
+        if (!overflows || !narrow) {
+            this.tbrExpanded = false;
+            tb.classList.remove('collapsible', 'expanded');
+            this.tbrMore.classList.remove('on');
+            return;
+        }
+        tb.classList.add('collapsible');
+        tb.classList.toggle('expanded', this.tbrExpanded);
+        this.tbrMore.classList.toggle('on', this.tbrExpanded);
     }
 
     /* ---------------------------------------------------------- menubar */
@@ -1568,6 +1634,7 @@ export class FableEditor implements FableEditorApi {
                 this.mItem('image', IC.image, () => this.insertImagePlaceholder()),
                 this.mItem('video', IC.video, () => this.videoDlg()),
                 { label: this.t('inserttable'), icon: IC.tableic, action: () => this.tableGrid((this.menubar.querySelector('[data-menu-key="table"]') as HTMLElement) || this.menubar) },
+                this.mItem('codesample', IC.codesampleic, () => this.codeDlg()),
                 { label: this.t('template'), icon: IC.templateic, subBuild: (el) => this.buildTemplatePickInto(el) },
                 this.mItem('hr', IC.hric, () => this.exec('insertHorizontalRule')),
                 '|',
@@ -1595,6 +1662,7 @@ export class FableEditor implements FableEditorApi {
                 this.mItem('strikethrough', IC.strikethrough, () => this.exec('strikeThrough')),
                 this.mItem('superscript', IC.superscriptic, () => this.exec('superscript')),
                 this.mItem('subscript', IC.subscriptic, () => this.exec('subscript')),
+                this.mItem('code', IC.inlinecodeic, () => this.toggleInlineCode()),
                 '|',
                 this.mItem('lowercase', IC.lowercaseic, () => this.transformCase('lower')),
                 this.mItem('uppercase', IC.uppercaseic, () => this.transformCase('upper')),
@@ -1608,7 +1676,10 @@ export class FableEditor implements FableEditorApi {
                 '|',
                 {
                     label: this.t('cell'),
-                    sub: [{ label: this.t('cellprops'), icon: IC.tableic, action: () => this.cellPropsDlg() }]
+                    sub: [
+                        { label: this.t('cellprops'), icon: IC.tableic, action: () => this.cellPropsDlg() },
+                        { label: this.t('cellbg'), icon: IC.palette, subBuild: (el) => this.buildCellFillInto(el) }
+                    ]
                 },
                 {
                     label: this.t('row'),
@@ -1616,6 +1687,9 @@ export class FableEditor implements FableEditorApi {
                         { label: this.t('rowabove'), icon: IC.rowbefore, action: () => this.tableOp('rowabove'), hover: (on) => this.setOpTarget(on ? 'row' : null) },
                         { label: this.t('rowbelow'), icon: IC.rowafter, action: () => this.tableOp('rowbelow'), hover: (on) => this.setOpTarget(on ? 'row' : null) },
                         { label: this.t('delrow'), icon: IC.rowdelete, action: () => this.tableOp('delrow'), hover: (on) => this.setOpTarget(on ? 'row' : null) },
+                        '|',
+                        { label: this.t('moverowup'), icon: IC.moverowup, action: () => this.tableMove('rowup'), hover: (on) => this.setOpTarget(on ? 'row' : null) },
+                        { label: this.t('moverowdown'), icon: IC.moverowdown, action: () => this.tableMove('rowdown'), hover: (on) => this.setOpTarget(on ? 'row' : null) },
                         '|',
                         { label: this.t('rowprops'), icon: IC.tableic, action: () => this.rowPropsDlg(), hover: (on) => this.setOpTarget(on ? 'row' : null) }
                     ]
@@ -1626,6 +1700,9 @@ export class FableEditor implements FableEditorApi {
                         { label: this.t('colbefore'), icon: IC.colbefore, action: () => this.tableOp('colbefore'), hover: (on) => this.setOpTarget(on ? 'col' : null) },
                         { label: this.t('colafter'), icon: IC.colafter, action: () => this.tableOp('colafter'), hover: (on) => this.setOpTarget(on ? 'col' : null) },
                         { label: this.t('delcol'), icon: IC.coldelete, action: () => this.tableOp('delcol'), hover: (on) => this.setOpTarget(on ? 'col' : null) },
+                        '|',
+                        { label: this.t('movecolleft'), icon: IC.movecolleft, action: () => this.tableMove('colleft'), hover: (on) => this.setOpTarget(on ? 'col' : null) },
+                        { label: this.t('movecolright'), icon: IC.movecolright, action: () => this.tableMove('colright'), hover: (on) => this.setOpTarget(on ? 'col' : null) },
                         '|',
                         { label: this.t('colprops'), icon: IC.tableic, action: () => this.colPropsDlg(), hover: (on) => this.setOpTarget(on ? 'col' : null) }
                     ]
@@ -1728,6 +1805,89 @@ export class FableEditor implements FableEditorApi {
         if (op === 'deltable') table.remove();
         this.onChange();
         this.positionTableHandles();
+    }
+
+    /** Reorders the current row/column: 'rowup'/'rowdown' swap the caret's row with
+     *  its neighbour, 'colleft'/'colright' move the caret's column one position in
+     *  DOM order across every row. The caret travels with the moved cell. */
+    private tableMove(op: 'rowup' | 'rowdown' | 'colleft' | 'colright'): void {
+        this.restoreSel();
+        const cell = this.currentCell();
+        if (!cell) return;
+        const row = cell.parentElement as HTMLTableRowElement;
+        const table = cell.closest('table') as HTMLTableElement;
+        const idx = Array.from(row.children).indexOf(cell);
+        if (op === 'rowup') {
+            const prev = row.previousElementSibling;
+            if (prev) prev.before(row);
+        }
+        if (op === 'rowdown') {
+            const next = row.nextElementSibling;
+            if (next) next.after(row);
+        }
+        if (op === 'colleft' && idx > 0) {
+            table.querySelectorAll('tr').forEach((tr) => {
+                const c = tr.children[idx];
+                const prev = tr.children[idx - 1];
+                if (c && prev) prev.before(c);
+            });
+        }
+        if (op === 'colright') {
+            table.querySelectorAll('tr').forEach((tr) => {
+                const c = tr.children[idx];
+                const next = tr.children[idx + 1];
+                if (c && next) next.after(c);
+            });
+        }
+        /* moving a node resets live ranges inside it (they collapse to the old
+           parent), so put the caret back into the moved cell explicitly — this is
+           what lets the user click "move" repeatedly to walk a row/column along */
+        const range = document.createRange();
+        range.selectNodeContents(cell);
+        range.collapse(true);
+        const s = window.getSelection();
+        if (s) {
+            s.removeAllRanges();
+            s.addRange(range);
+        }
+        this.saveSel();
+        this.onChange();
+        this.positionTableHandles();
+        this.positionCellMarker();
+    }
+
+    /** Color grid applying a background to the caret's cell — the direct way to
+     *  build header rows (the toolbar's backcolor highlights text, not cells). */
+    private buildCellFillInto(el: HTMLElement): void {
+        const apply = (c: string | null) => {
+            const cell = this.currentCell();
+            if (!cell) {
+                alert(this.t('nocell'));
+                return;
+            }
+            this.setOrClear(cell, 'background-color', c || '');
+            this.onChange();
+        };
+        const grid = document.createElement('div');
+        grid.className = 'cpal';
+        COLORS.forEach((c) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.style.background = c;
+            b.title = c;
+            b.addEventListener('click', () => {
+                this.closePop();
+                apply(c);
+            });
+            grid.appendChild(b);
+        });
+        el.appendChild(grid);
+        el.insertAdjacentHTML('beforeend', '<div class="sep"></div>');
+        this.menuItems(el, [{ label: this.t('removecolor'), icon: IC.hric, action: () => apply(null) }]);
+    }
+
+    private cellFillMenu(anchor: HTMLElement): void {
+        this.popup(anchor, (el) => this.buildCellFillInto(el));
     }
 
     private applyTableProps(table: HTMLTableElement, vals: Record<string, string>): void {
@@ -2927,6 +3087,265 @@ export class FableEditor implements FableEditorApi {
         return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
     }
 
+    private escHtml(s: string): string {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    /* ---------------------------------------------------------- inline code & code samples */
+    /** The inline <code> run the caret sits in, if any (code blocks don't count). */
+    private closestInlineCode(): HTMLElement | null {
+        const s = window.getSelection();
+        const node = s && this.ed.contains(s.anchorNode) ? s.anchorNode : null;
+        if (!node) return null;
+        const el = node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node.parentElement;
+        const code = el?.closest('code') as HTMLElement | null;
+        return code && this.ed.contains(code) && !code.closest('pre') ? code : null;
+    }
+
+    /** Wraps the selection in an inline <code> run, or unwraps the run the caret is
+     *  in. Selections spanning multiple blocks are left alone (a <code> can't wrap
+     *  across paragraphs without producing invalid markup). */
+    private toggleInlineCode(): void {
+        this.restoreSel();
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        const existing = this.closestInlineCode();
+        if (existing) {
+            const first = existing.firstChild;
+            const last = existing.lastChild;
+            while (existing.firstChild) existing.parentNode!.insertBefore(existing.firstChild, existing);
+            existing.remove();
+            if (first && last) {
+                const r = document.createRange();
+                r.setStartBefore(first);
+                r.setEndAfter(last);
+                sel.removeAllRanges();
+                sel.addRange(r);
+            }
+        } else {
+            const range = sel.getRangeAt(0);
+            if (range.collapsed) return;
+            if (this.closestBlock(range.startContainer) !== this.closestBlock(range.endContainer)) return;
+            const code = document.createElement('code');
+            code.appendChild(range.extractContents());
+            range.insertNode(code);
+            const r = document.createRange();
+            r.selectNodeContents(code);
+            sel.removeAllRanges();
+            sel.addRange(r);
+        }
+        this.saveSel();
+        this.refreshState();
+        this.onChange();
+    }
+
+    /** Typing `snippet` converts to an inline <code> run the moment the closing
+     *  backtick is typed, so code can be marked up without reaching for the toolbar. */
+    private tryCodeTyping(e: KeyboardEvent): void {
+        const sel = window.getSelection();
+        if (!sel || !sel.isCollapsed || !sel.anchorNode) return;
+        const node = sel.anchorNode;
+        if (node.nodeType !== Node.TEXT_NODE || !this.ed.contains(node)) return;
+        if (node.parentElement?.closest('code, pre')) return;
+        const before = (node.textContent || '').slice(0, sel.anchorOffset);
+        const m = before.match(/(?:^|[^`])`([^`]+)$/);
+        if (!m) return;
+        const src = m[1];
+        if (/^\s|\s$/.test(src)) return;
+        e.preventDefault();
+        const range = document.createRange();
+        range.setStart(node, sel.anchorOffset - src.length - 1);
+        range.setEnd(node, sel.anchorOffset);
+        /* direct DOM instead of execCommand('insertHTML') — with styleWithCSS
+           active the browser rewrites a pasted <code> into a styled <span>,
+           losing the semantic tag */
+        range.deleteContents();
+        const code = document.createElement('code');
+        code.textContent = src;
+        range.insertNode(code);
+        const after = document.createRange();
+        after.setStartAfter(code);
+        after.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(after);
+        this.saveSel();
+        this.onChange();
+    }
+
+    /** Custom dropdown for dialog fields (a native <select> popup can't be styled):
+     *  a field-styled button showing the current choice that opens a floating,
+     *  scrollable option list. Read the current choice via `.value()`. */
+    private dlgSelect(options: [string, string][], selected: string): { el: HTMLElement; value: () => string } {
+        let value = selected;
+        const el = document.createElement('div');
+        el.className = 'dsel';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'dsel-btn';
+        const lbl = document.createElement('span');
+        lbl.className = 'lbl';
+        lbl.textContent = options.find(([v]) => v === selected)?.[1] || '';
+        btn.append(lbl);
+        btn.insertAdjacentHTML('beforeend', IC.chev);
+        const list = document.createElement('div');
+        list.className = 'dsel-list';
+        options.forEach(([v, label]) => {
+            const o = document.createElement('button');
+            o.type = 'button';
+            o.textContent = label;
+            o.classList.toggle('on', v === value);
+            o.addEventListener('click', () => {
+                value = v;
+                lbl.textContent = label;
+                list.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === o));
+                el.classList.remove('open');
+                btn.focus();
+            });
+            list.appendChild(o);
+        });
+        btn.addEventListener('click', () => {
+            el.classList.toggle('open');
+            if (el.classList.contains('open')) (list.querySelector('.on') as HTMLElement | null)?.scrollIntoView({ block: 'nearest' });
+        });
+        el.addEventListener('focusout', (e) => {
+            if (!el.contains((e as FocusEvent).relatedTarget as Node)) el.classList.remove('open');
+        });
+        el.addEventListener('keydown', (e) => {
+            /* Escape closes the open list without closing the whole dialog */
+            if ((e as KeyboardEvent).key === 'Escape' && el.classList.contains('open')) {
+                e.stopPropagation();
+                el.classList.remove('open');
+                btn.focus();
+            }
+        });
+        el.append(btn, list);
+        return { el, value: () => value };
+    }
+
+    /** Insert/edit-code-sample dialog: language dropdown + monospace textarea to
+     *  paste or type code into. Inserts a non-editable <pre class="code-block">
+     *  whose header shows the language; click the block to edit / copy / delete. */
+    private codeDlg(existing?: HTMLElement): void {
+        this.saveSel();
+        let langDd: { el: HTMLElement; value: () => string };
+        let ta: HTMLTextAreaElement;
+        this.dialog(
+            this.t('codedlgttl'),
+            (body) => {
+                const f = document.createElement('div');
+                f.className = 'dfield';
+                const l = document.createElement('label');
+                l.textContent = this.t('codelang');
+                langDd = this.dlgSelect(CODE_LANGS, existing?.dataset.lang || 'plain');
+                f.append(l, langDd.el);
+                ta = document.createElement('textarea');
+                ta.className = 'code-input';
+                ta.spellcheck = false;
+                ta.value = existing?.querySelector('code')?.textContent || '';
+                ta.placeholder = 'const answer = 42;';
+                body.append(f, ta);
+                setTimeout(() => ta.focus(), 0);
+            },
+            [
+                { label: this.t('cancel'), action: () => this.closeDlg() },
+                {
+                    label: this.t('save'),
+                    primary: true,
+                    action: () => {
+                        const src = ta.value.replace(/\s+$/, '');
+                        const lang = langDd.value();
+                        const label = CODE_LANGS.find(([v]) => v === lang)?.[1] || lang;
+                        this.closeDlg();
+                        if (!src.trim()) return;
+                        if (existing) {
+                            existing.dataset.lang = lang;
+                            existing.setAttribute('data-lang-label', label);
+                            const codeEl = existing.querySelector('code') || existing;
+                            codeEl.textContent = src;
+                            this.clearCodeSel();
+                            this.onChange();
+                            return;
+                        }
+                        this.restoreSel();
+                        document.execCommand(
+                            'insertHTML',
+                            false,
+                            `<pre class="code-block" contenteditable="false" data-lang="${lang}" data-lang-label="${this.escapeAttr(label)}">` +
+                                `<code>${this.escHtml(src)}</code></pre><p><br></p>`
+                        );
+                        this.onChange();
+                    }
+                }
+            ]
+        );
+    }
+
+    private clearCodeSel(): void {
+        this.codeCtx?.remove();
+        this.codeCtx = null;
+        this.codeActive?.classList.remove('code-selected');
+        this.codeActive = null;
+    }
+
+    private selectCodeEl(el: HTMLElement): void {
+        if (this.codeActive === el) return;
+        this.clearCodeSel();
+        this.codeActive = el;
+        el.classList.add('code-selected');
+        this.codeCtx = this.buildCodeCtxToolbar(el);
+        this.positionCodeCtx();
+    }
+
+    private buildCodeCtxToolbar(el: HTMLElement): HTMLElement {
+        const ctx = document.createElement('div');
+        ctx.className = 'imgctx';
+        ctx.dir = this.dir();
+        ctx.append(
+            this.ctxBtn(IC.editic, this.t('editcode'), () => this.codeDlg(el)),
+            this.ctxBtn(IC.copyic, this.t('copycode'), () => this.copyCodeBlock(el)),
+            this.ctxSep(),
+            this.ctxBtn(IC.trash, this.t('deletecode'), () => {
+                el.remove();
+                this.clearCodeSel();
+                this.onChange();
+            })
+        );
+        ctx.addEventListener('mousedown', (e) => e.preventDefault());
+        document.body.appendChild(ctx);
+        return ctx;
+    }
+
+    private copyCodeBlock(el: HTMLElement): void {
+        const text = el.querySelector('code')?.textContent ?? el.textContent ?? '';
+        if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(text).catch(() => {});
+            return;
+        }
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+    }
+
+    private positionCodeCtx(): void {
+        if (!this.codeActive || !document.body.contains(this.codeActive)) {
+            this.clearCodeSel();
+            return;
+        }
+        const r = this.codeActive.getBoundingClientRect();
+        if (!this.codeCtx) return;
+        const cw = this.codeCtx.offsetWidth;
+        const ch = this.codeCtx.offsetHeight;
+        let cx = r.left + scrollX + (r.width - cw) / 2;
+        cx = Math.max(8 + scrollX, Math.min(cx, scrollX + innerWidth - cw - 8));
+        let cy = r.top + scrollY - ch - 8;
+        if (cy < this.ctxMinTop()) cy = r.bottom + scrollY + 8;
+        this.codeCtx.style.left = cx + 'px';
+        this.codeCtx.style.top = cy + 'px';
+    }
+
     /* ---------------------------------------------------------- templates */
     private templateMenu(anchor: HTMLElement): void {
         this.popup(anchor, (el) => this.buildTemplatePickInto(el));
@@ -3173,15 +3592,21 @@ export class FableEditor implements FableEditorApi {
             b.addEventListener('mouseleave', () => this.setOpTarget(null));
             return b;
         };
+        const fillBtn = this.ctxBtn(IC.palette, this.t('cellbg'), () => this.cellFillMenu(fillBtn));
         el.append(
             hl(this.ctxBtn(IC.rowbefore, this.t('rowabove'), () => this.tableOp('rowabove')), 'row'),
             hl(this.ctxBtn(IC.rowafter, this.t('rowbelow'), () => this.tableOp('rowbelow')), 'row'),
+            hl(this.ctxBtn(IC.moverowup, this.t('moverowup'), () => this.tableMove('rowup')), 'row'),
+            hl(this.ctxBtn(IC.moverowdown, this.t('moverowdown'), () => this.tableMove('rowdown')), 'row'),
             hl(this.ctxBtn(IC.rowdelete, this.t('delrow'), () => this.tableOp('delrow')), 'row'),
             this.ctxSep(),
             hl(this.ctxBtn(IC.colbefore, this.t('colbefore'), () => this.tableOp('colbefore')), 'col'),
             hl(this.ctxBtn(IC.colafter, this.t('colafter'), () => this.tableOp('colafter')), 'col'),
+            hl(this.ctxBtn(IC.movecolleft, this.t('movecolleft'), () => this.tableMove('colleft')), 'col'),
+            hl(this.ctxBtn(IC.movecolright, this.t('movecolright'), () => this.tableMove('colright')), 'col'),
             hl(this.ctxBtn(IC.coldelete, this.t('delcol'), () => this.tableOp('delcol')), 'col'),
             this.ctxSep(),
+            fillBtn,
             this.ctxBtn(IC.trash, this.t('deltable'), () => this.tableOp('deltable')),
             this.ctxBtn(IC.tableic, this.t('tablepropsttl'), () => this.tablePropsDlg())
         );
@@ -3571,6 +3996,7 @@ export class FableEditor implements FableEditorApi {
             backBtn,
             this.ctxSep(),
             this.ctxBtn(IC.quote, this.t('quote'), () => this.toggleBlock('blockquote'), 'blockquote'),
+            this.ctxBtn(IC.inlinecodeic, this.t('code'), () => this.toggleInlineCode(), 'code'),
             this.ctxBtn('<b style="font:700 12px/1 Arial,sans-serif">H2</b>', this.blockLabel('h2'), () => this.toggleBlock('h2'), 'h2'),
             this.ctxBtn('<b style="font:700 12px/1 Arial,sans-serif">H3</b>', this.blockLabel('h3'), () => this.toggleBlock('h3'), 'h3'),
             this.ctxSep(),
@@ -3663,6 +4089,8 @@ export class FableEditor implements FableEditorApi {
                 const b = container.querySelector(`[data-id=${tag}]`) as HTMLElement | null;
                 if (b) b.classList.toggle('on', inEd && blkTag === tag);
             });
+            const codeB = container.querySelector('[data-id=code]') as HTMLElement | null;
+            if (codeB) codeB.classList.toggle('on', inEd && !!this.closestInlineCode());
         });
         const blk = s ? this.closestBlock(s.anchorNode) : null;
         const dir = blk?.closest('[dir]')?.getAttribute('dir') || this.ed.getAttribute('dir') || this.dir();
@@ -3731,6 +4159,7 @@ export class FableEditor implements FableEditorApi {
         this.clearImgPlaceholderSel();
         this.clearVphPlaceholderSel();
         this.clearVidHandles();
+        this.clearCodeSel();
         this.shell.dir = this.dir();
         this.ed.dir = this.dir();
         if (this.options.menubar) this.buildMenubar();
