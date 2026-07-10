@@ -219,7 +219,7 @@ test/
 
 ## Author
 
-Sajin Satheesan <an.sajinsatheesan@gmail.com>
+Sajin Satheesan <an.sajinsatheesan@gmail.com> — [LinkedIn](https://www.linkedin.com/in/sajin-satheesan-b5759a126/)
 
 ## License
 

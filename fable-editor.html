@@ -884,6 +884,31 @@
                font-size: 14px
           }
 
+          /* flyout submenus */
+          .pop.sub {
+               z-index: 1210;
+          }
+
+          .pop .mi .subarrow {
+               margin-inline-start: auto;
+               padding-inline-start: 18px;
+               display: flex;
+               align-items: center;
+          }
+
+          .pop .mi .subarrow svg {
+               width: 10px;
+               height: 10px;
+               stroke: #7a828e;
+               stroke-width: 2;
+               fill: none;
+               transform: rotate(-90deg);
+          }
+
+          [dir=rtl] .pop .mi .subarrow svg {
+               transform: rotate(90deg);
+          }
+
           /* color palette */
           .cpal {
                display: grid;

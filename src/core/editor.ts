@@ -1175,31 +1175,29 @@ export class FableEditor implements FableEditorApi {
         container.querySelectorAll(`[data-cb=back]`).forEach((el) => ((el as HTMLElement).style.background = this.backColor));
     }
 
+    private fontItems(): MenuItemDef[] {
+        return this.options.fontFamilyFormats.map(([name, val]) => ({
+            label: name,
+            previewStyle: `font-family:${val}`,
+            on: this.currentFont() === name,
+            action: () => this.exec('fontName', val)
+        }));
+    }
+
     private fontMenu(anchor: HTMLButtonElement): void {
-        this.popup(anchor, (el) => {
-            this.menuItems(
-                el,
-                this.options.fontFamilyFormats.map(([name, val]) => ({
-                    label: name,
-                    previewStyle: `font-family:${val}`,
-                    on: this.currentFont() === name,
-                    action: () => this.exec('fontName', val)
-                }))
-            );
-        });
+        this.popup(anchor, (el) => this.menuItems(el, this.fontItems()));
+    }
+
+    private sizeItems(): MenuItemDef[] {
+        return SIZES.map((s) => ({
+            label: s,
+            on: this.currentSize() === s,
+            action: () => this.applyFontSize(s)
+        }));
     }
 
     private sizeMenu(anchor: HTMLButtonElement): void {
-        this.popup(anchor, (el) => {
-            this.menuItems(
-                el,
-                SIZES.map((s) => ({
-                    label: s,
-                    on: this.currentSize() === s,
-                    action: () => this.applyFontSize(s)
-                }))
-            );
-        });
+        this.popup(anchor, (el) => this.menuItems(el, this.sizeItems()));
     }
 
     /** Font sizing needs a non-collapsed range. With a bare caret, grow the
@@ -1306,14 +1304,16 @@ export class FableEditor implements FableEditorApi {
         this.onChange();
     }
 
+    private caseItems(): MenuItemDef[] {
+        return [
+            { label: this.t('lowercase'), icon: IC.lowercaseic, action: () => this.transformCase('lower') },
+            { label: this.t('uppercase'), icon: IC.uppercaseic, action: () => this.transformCase('upper') },
+            { label: this.t('capitalize'), icon: IC.capitalizeic, action: () => this.transformCase('capitalize') }
+        ];
+    }
+
     private caseMenu(anchor: HTMLButtonElement): void {
-        this.popup(anchor, (el) => {
-            this.menuItems(el, [
-                { label: this.t('lowercase'), icon: IC.lowercaseic, action: () => this.transformCase('lower') },
-                { label: this.t('uppercase'), icon: IC.uppercaseic, action: () => this.transformCase('upper') },
-                { label: this.t('capitalize'), icon: IC.capitalizeic, action: () => this.transformCase('capitalize') }
-            ]);
-        });
+        this.popup(anchor, (el) => this.menuItems(el, this.caseItems()));
     }
 
     private applyBlockStyle(prop: 'lineHeight' | 'wordSpacing' | 'letterSpacing', value: string): void {
@@ -1334,46 +1334,28 @@ export class FableEditor implements FableEditorApi {
         return b ? b.style[prop] || '' : '';
     }
 
+    private blockStyleItems(prop: 'lineHeight' | 'wordSpacing' | 'letterSpacing', values: string[]): MenuItemDef[] {
+        const cur = this.currentBlockStyle(prop);
+        return [
+            { label: this.t('normal'), on: !cur, action: () => this.applyBlockStyle(prop, '') },
+            ...values.map((v) => ({
+                label: v,
+                on: cur === v,
+                action: () => this.applyBlockStyle(prop, v)
+            }))
+        ];
+    }
+
     private lineHeightMenu(anchor: HTMLButtonElement): void {
-        const cur = this.currentBlockStyle('lineHeight');
-        this.popup(anchor, (el) => {
-            this.menuItems(el, [
-                { label: this.t('normal'), on: !cur, action: () => this.applyBlockStyle('lineHeight', '') },
-                ...LINE_HEIGHTS.map((v) => ({
-                    label: v,
-                    on: cur === v,
-                    action: () => this.applyBlockStyle('lineHeight', v)
-                }))
-            ]);
-        });
+        this.popup(anchor, (el) => this.menuItems(el, this.blockStyleItems('lineHeight', LINE_HEIGHTS)));
     }
 
     private wordSpacingMenu(anchor: HTMLButtonElement): void {
-        const cur = this.currentBlockStyle('wordSpacing');
-        this.popup(anchor, (el) => {
-            this.menuItems(el, [
-                { label: this.t('normal'), on: !cur, action: () => this.applyBlockStyle('wordSpacing', '') },
-                ...WORD_SPACINGS.map((v) => ({
-                    label: v,
-                    on: cur === v,
-                    action: () => this.applyBlockStyle('wordSpacing', v)
-                }))
-            ]);
-        });
+        this.popup(anchor, (el) => this.menuItems(el, this.blockStyleItems('wordSpacing', WORD_SPACINGS)));
     }
 
     private letterSpacingMenu(anchor: HTMLButtonElement): void {
-        const cur = this.currentBlockStyle('letterSpacing');
-        this.popup(anchor, (el) => {
-            this.menuItems(el, [
-                { label: this.t('normal'), on: !cur, action: () => this.applyBlockStyle('letterSpacing', '') },
-                ...LETTER_SPACINGS.map((v) => ({
-                    label: v,
-                    on: cur === v,
-                    action: () => this.applyBlockStyle('letterSpacing', v)
-                }))
-            ]);
-        });
+        this.popup(anchor, (el) => this.menuItems(el, this.blockStyleItems('letterSpacing', LETTER_SPACINGS)));
     }
 
     private closestAnchor(): HTMLAnchorElement | null {
@@ -1458,22 +1440,36 @@ export class FableEditor implements FableEditorApi {
         );
     }
 
+    private blockItems(): MenuItemDef[] {
+        return BLOCKS.map(([tag]) => ({
+            label: this.blockLabel(tag),
+            previewStyle: tag.startsWith('h')
+                ? `font-weight:700;font-size:${22 - 2 * (+tag[1])}px`
+                : tag === 'pre'
+                    ? 'font-family:monospace'
+                    : '',
+            on: this.currentBlock() === tag,
+            action: () => this.exec('formatBlock', '<' + tag + '>')
+        }));
+    }
+
     private blocksMenu(anchor: HTMLButtonElement): void {
-        this.popup(anchor, (el) => {
-            this.menuItems(
-                el,
-                BLOCKS.map(([tag, key]) => ({
-                    label: this.blockLabel(tag),
-                    previewStyle: tag.startsWith('h')
-                        ? `font-weight:700;font-size:${22 - 2 * (+tag[1])}px`
-                        : tag === 'pre'
-                            ? 'font-family:monospace'
-                            : '',
-                    on: this.currentBlock() === tag,
-                    action: () => this.exec('formatBlock', '<' + tag + '>')
-                }))
-            );
-        });
+        this.popup(anchor, (el) => this.menuItems(el, this.blockItems()));
+    }
+
+    private alignItems(): MenuItemDef[] {
+        const cmds: ['justifyLeft' | 'justifyCenter' | 'justifyRight' | 'justifyFull', keyof I18nStrings, string][] = [
+            ['justifyLeft', 'alignleft', IC.alignleft],
+            ['justifyCenter', 'aligncenter', IC.aligncenter],
+            ['justifyRight', 'alignright', IC.alignright],
+            ['justifyFull', 'alignjustify', IC.alignjustify]
+        ];
+        return cmds.map(([cmd, key, icon]) => ({
+            label: this.t(key),
+            icon,
+            on: document.queryCommandState(cmd),
+            action: () => this.exec(cmd)
+        }));
     }
 
     private blockLabel(tag: string): string {
@@ -1748,10 +1744,28 @@ export class FableEditor implements FableEditorApi {
                 this.mItem('superscript', IC.superscriptic, () => this.exec('superscript')),
                 this.mItem('subscript', IC.subscriptic, () => this.exec('subscript')),
                 this.mItem('code', IC.inlinecodeic, () => this.toggleInlineCode()),
+                this.mItem('quote', IC.quote, () => this.toggleBlock('blockquote')),
                 '|',
-                this.mItem('lowercase', IC.lowercaseic, () => this.transformCase('lower')),
-                this.mItem('uppercase', IC.uppercaseic, () => this.transformCase('upper')),
-                this.mItem('capitalize', IC.capitalizeic, () => this.transformCase('capitalize')),
+                { label: this.t('fontfamily'), subBuild: (el) => this.menuItems(el, this.fontItems()) },
+                { label: this.t('fontsize'), subBuild: (el) => this.menuItems(el, this.sizeItems()) },
+                { label: this.t('blocks'), subBuild: (el) => this.menuItems(el, this.blockItems()) },
+                { label: this.t('align'), subBuild: (el) => this.menuItems(el, this.alignItems()) },
+                { label: this.t('lineheight'), icon: IC.lineheight, subBuild: (el) => this.menuItems(el, this.blockStyleItems('lineHeight', LINE_HEIGHTS)) },
+                { label: this.t('wordspacing'), icon: IC.wordspacing, subBuild: (el) => this.menuItems(el, this.blockStyleItems('wordSpacing', WORD_SPACINGS)) },
+                { label: this.t('letterspacing'), icon: IC.letterspacing, subBuild: (el) => this.menuItems(el, this.blockStyleItems('letterSpacing', LETTER_SPACINGS)) },
+                '|',
+                { label: this.t('forecolor'), icon: IC.palette, subBuild: (el) => this.buildPaletteInto(el, this.foreColor, (c) => this.applyColor('fore', c)) },
+                { label: this.t('backcolor'), icon: IC.backcolor, subBuild: (el) => this.buildPaletteInto(el, this.backColor, (c) => this.applyColor('back', c)) },
+                '|',
+                this.mItem('bullist', IC.bullist, () => this.exec('insertUnorderedList')),
+                this.mItem('numlist', IC.numlist, () => this.exec('insertOrderedList')),
+                this.mItem('outdent', IC.outdent, () => this.exec('outdent')),
+                this.mItem('indent', IC.indent, () => this.exec('indent')),
+                '|',
+                this.mItem('ltr', IC.ltr, () => this.setDir('ltr')),
+                this.mItem('rtl', IC.rtl, () => this.setDir('rtl')),
+                '|',
+                { label: this.t('changecase'), icon: IC.caseic, sub: this.caseItems() },
                 '|',
                 this.mItem('clearformat', IC.clearformatic, () => this.exec('removeFormat'))
             ],
