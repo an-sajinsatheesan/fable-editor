@@ -26,7 +26,7 @@ en:{ dir:'ltr',
   deltable:'Delete table',
   ltr:'Left to right',rtl:'Right to left',
   alignleft:'Align left',aligncenter:'Align center',alignright:'Align right',
-  alignjustify:'Justify',numlist:'Numbered list',bullist:'Bullet list',
+  alignjustify:'Justify',align:'Align',numlist:'Numbered list',bullist:'Bullet list',
   forecolor:'Text color',backcolor:'Background color',removeformat:'Clear formatting',
   outdent:'Decrease indent',indent:'Increase indent',
   fontfamily:'Font family',fontsize:'Font size',blocks:'Blocks',
@@ -81,7 +81,7 @@ ar:{ dir:'rtl',
   deltable:'حذف الجدول',
   ltr:'من اليسار إلى اليمين',rtl:'من اليمين إلى اليسار',
   alignleft:'محاذاة لليسار',aligncenter:'توسيط',alignright:'محاذاة لليمين',
-  alignjustify:'ضبط',numlist:'قائمة رقمية',bullist:'قائمة نقطية',
+  alignjustify:'ضبط',align:'محاذاة',numlist:'قائمة رقمية',bullist:'قائمة نقطية',
   forecolor:'لون النص',backcolor:'لون الخلفية',removeformat:'مسح التنسيق',
   outdent:'إنقاص المسافة البادئة',indent:'زيادة المسافة البادئة',
   fontfamily:'عائلة الخط',fontsize:'حجم الخط',blocks:'الفقرات',
@@ -359,9 +359,28 @@ function selectedBlocks(){
 }
 
 /* ---------------------------------------------------------- popups */
-let openPop = null, popAnchor = null;
-function closePop(){ if(openPop){ openPop.remove(); openPop=null;
+let openPop = null, popAnchor = null, openSubEl = null;
+function closeSub(){ openSubEl?.remove(); openSubEl=null; }
+function closePop(){ closeSub(); if(openPop){ openPop.remove(); openPop=null;
   popAnchor?.classList.remove('open'); popAnchor=null; } }
+function openSubFor(item, anchor){
+  closeSub();
+  const sub = document.createElement('div');
+  sub.className = 'pop sub'; sub.dir = t('dir');
+  if(item.subBuild) item.subBuild(sub);
+  else if(item.sub) menuItems(sub, item.sub);
+  sub.addEventListener('mousedown', e=>{ if(e.target.tagName!=='INPUT') e.preventDefault(); });
+  document.body.appendChild(sub);
+  const r = anchor.getBoundingClientRect();
+  const isRtl = t('dir')==='rtl';
+  /* overlap the parent item slightly so the pointer can travel into the flyout */
+  let x = isRtl ? r.left - sub.offsetWidth + 2 : r.right - 2;
+  x = Math.max(8, Math.min(x + scrollX, scrollX + innerWidth - sub.offsetWidth - 8));
+  let y = r.top + scrollY - 6;
+  y = Math.max(8 + scrollY, Math.min(y, scrollY + innerHeight - sub.offsetHeight - 8));
+  sub.style.left = x + 'px'; sub.style.top = y + 'px';
+  openSubEl = sub;
+}
 function popup(anchor, build, cls){
   if(openPop && popAnchor === anchor){ closePop(); return; }
   closePop();
@@ -379,7 +398,8 @@ function popup(anchor, build, cls){
   openPop = el; popAnchor = anchor; anchor.classList.add('open');
 }
 document.addEventListener('mousedown', e=>{
-  if(openPop && !openPop.contains(e.target) && !popAnchor.contains(e.target)) closePop();
+  if(openPop && !openPop.contains(e.target) && !popAnchor.contains(e.target)
+     && !(openSubEl && openSubEl.contains(e.target))) closePop();
 });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closePop(); closeDlg(); }});
 
@@ -437,10 +457,15 @@ addEventListener('scroll', hideTip, true);
 function menuItems(el, items){
   items.forEach(it=>{
     if(it==='|'){ el.insertAdjacentHTML('beforeend','<div class="sep"></div>'); return; }
+    const hasSub = !!(it.sub || it.subBuild);
     const b = document.createElement('button');
     b.className = 'mi' + (it.on ? ' on':'');
-    b.innerHTML = `<span class="ic">${it.icon||''}</span><span class="prev" ${it.previewStyle?`style="${it.previewStyle}"`:''}>${it.label}</span>${it.shortcut?`<span class="sc">${it.shortcut}</span>`:''}`;
-    b.addEventListener('click', ()=>{ closePop(); it.action(); });
+    b.innerHTML = `<span class="ic">${it.icon||''}</span><span class="prev" ${it.previewStyle?`style="${it.previewStyle}"`:''}>${it.label}</span>${it.shortcut?`<span class="sc">${it.shortcut}</span>`:''}${hasSub?`<span class="subarrow">${IC.chev}</span>`:''}`;
+    b.addEventListener('click', ()=>{ if(!it.action) return; closePop(); it.action(); });
+    b.addEventListener('mouseenter', ()=>{
+      if(hasSub) openSubFor(it, b);
+      else if(openSubEl && el!==openSubEl) closeSub();
+    });
     el.appendChild(b);
   });
 }
@@ -536,18 +561,32 @@ function applyColor(kind, c){
     el.style.background = (kind==='fore'?foreColor:backColor));
 }
 
-function fontMenu(anchor){
-  popup(anchor, el=>menuItems(el, FONTS.map(([name,val])=>({
+function fontItems(){
+  return FONTS.map(([name,val])=>({
     label:name, previewStyle:`font-family:${val}`,
     on: currentFont()===name,
     action:()=>exec('fontName', val)
-  }))));
+  }));
 }
-function sizeMenu(anchor){
-  popup(anchor, el=>menuItems(el, SIZES.map(s=>({
+function fontMenu(anchor){ popup(anchor, el=>menuItems(el, fontItems())); }
+function sizeItems(){
+  return SIZES.map(s=>({
     label:s, on: currentSize()===s,
     action:()=>applyFontSize(s)
-  }))));
+  }));
+}
+function sizeMenu(anchor){ popup(anchor, el=>menuItems(el, sizeItems())); }
+function alignItems(){
+  return [
+    ['justifyLeft','alignleft'],
+    ['justifyCenter','aligncenter'],
+    ['justifyRight','alignright'],
+    ['justifyFull','alignjustify']
+  ].map(([cmd,key])=>({
+    label:t(key), icon:IC[key],
+    on: document.queryCommandState(cmd),
+    action:()=>exec(cmd)
+  }));
 }
 function applyFontSize(pt){
   restoreSel();
@@ -561,15 +600,16 @@ function applyFontSize(pt){
   });
   saveSel(); refreshState(); onChange();
 }
-function blocksMenu(anchor){
-  popup(anchor, el=>menuItems(el, BLOCKS.map(([tag,key])=>({
+function blockItems(){
+  return BLOCKS.map(([tag])=>({
     label: blockLabel(tag),
     previewStyle: tag.startsWith('h') ? `font-weight:700;font-size:${22-2*(+tag[1])}px`
                 : tag==='pre' ? 'font-family:monospace' : '',
     on: currentBlock()===tag,
     action:()=>exec('formatBlock', '<'+tag+'>')
-  }))));
+  }));
 }
+function blocksMenu(anchor){ popup(anchor, el=>menuItems(el, blockItems())); }
 function blockLabel(tag){
   if(tag==='p') return t('para');
   if(tag==='pre') return t('pre');
@@ -736,6 +776,18 @@ function buildMenubar(){
            mItem('superscript',null,()=>exec('superscript')),
            mItem('subscript',null,()=>exec('subscript')),
            mItem('code',IC.inlinecodeic,toggleInlineCode), '|',
+           {label:t('fontfamily'), subBuild:el=>menuItems(el, fontItems())},
+           {label:t('fontsize'), subBuild:el=>menuItems(el, sizeItems())},
+           {label:t('blocks'), subBuild:el=>menuItems(el, blockItems())},
+           {label:t('align'), subBuild:el=>menuItems(el, alignItems())}, '|',
+           {label:t('forecolor'), icon:IC.palette, subBuild:el=>buildPaletteInto(el, foreColor, c=>applyColor('fore',c))},
+           {label:t('backcolor'), icon:IC.backcolor, subBuild:el=>buildPaletteInto(el, backColor, c=>applyColor('back',c))}, '|',
+           mItem('bullist',IC.bullist,()=>exec('insertUnorderedList')),
+           mItem('numlist',IC.numlist,()=>exec('insertOrderedList')),
+           mItem('outdent',IC.outdent,()=>exec('outdent')),
+           mItem('indent',IC.indent,()=>exec('indent')), '|',
+           mItem('ltr',IC.ltr,()=>setDir('ltr')),
+           mItem('rtl',IC.rtl,()=>setDir('rtl')), '|',
            mItem('clearformat',null,()=>exec('removeFormat')) ],
     tools:[ mItem('sourcecode',IC.srcic,sourceDlg),
            mItem('wordcount',IC.wcic,wordCountDlg) ],

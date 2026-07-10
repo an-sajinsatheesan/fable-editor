@@ -54,6 +54,7 @@ export interface I18nStrings {
   aligncenter: string;
   alignright: string;
   alignjustify: string;
+  align: string;
   numlist: string;
   bullist: string;
   forecolor: string;
@@ -247,6 +248,7 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     aligncenter: 'Align center',
     alignright: 'Align right',
     alignjustify: 'Justify',
+    align: 'Align',
     numlist: 'Numbered list',
     bullist: 'Bullet list',
     forecolor: 'Text color',
@@ -438,6 +440,7 @@ export const I18N: Record<EditorLanguage, I18nStrings> = {
     aligncenter: 'توسيط',
     alignright: 'محاذاة لليمين',
     alignjustify: 'ضبط',
+    align: 'محاذاة',
     numlist: 'قائمة رقمية',
     bullist: 'قائمة نقطية',
     forecolor: 'لون النص',
