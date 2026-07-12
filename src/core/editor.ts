@@ -392,6 +392,7 @@ export class FableEditor implements FableEditorApi {
                 this.removeVphPlaceholder();
             }
             if (e.key === '`' && !e.ctrlKey && !e.metaKey && !e.altKey) this.tryCodeTyping(e);
+            if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) this.tryExitBlockquote(e);
         });
         this.on(this.ed, 'paste', (e: ClipboardEvent) => this.handlePaste(e));
         this.on(this.ed, 'drop', (e: DragEvent) => {
@@ -748,6 +749,29 @@ export class FableEditor implements FableEditorApi {
             node = (node as ChildNode).parentNode;
         }
         return null;
+    }
+
+    /** Enter on an empty last line inside a blockquote exits it into a plain paragraph, mirroring how lists exit on an empty item. */
+    private tryExitBlockquote(e: KeyboardEvent): void {
+        const s = window.getSelection();
+        if (!s || !s.isCollapsed || !s.anchorNode || !this.ed.contains(s.anchorNode)) return;
+        const block = this.closestBlock(s.anchorNode);
+        if (!block || block.tagName === 'BLOCKQUOTE' || (block.textContent || '').trim() !== '') return;
+        const bq = block.closest('blockquote');
+        if (!bq || !this.ed.contains(bq) || block !== bq.lastElementChild) return;
+        e.preventDefault();
+        const p = document.createElement('p');
+        p.appendChild(document.createElement('br'));
+        bq.after(p);
+        block.remove();
+        if (!bq.firstElementChild) bq.remove();
+        const r = document.createRange();
+        r.setStart(p, 0);
+        r.collapse(true);
+        s.removeAllRanges();
+        s.addRange(r);
+        this.saveSel();
+        this.onChange();
     }
 
     private selectedBlocks(): HTMLElement[] {
@@ -4058,7 +4082,26 @@ export class FableEditor implements FableEditorApi {
 
     /* ---------------------------------------------------------- selection bubble toolbar */
     private toggleBlock(tag: string): void {
-        this.exec('formatBlock', this.currentBlock() === tag ? '<p>' : '<' + tag + '>');
+        const active = this.currentBlock() === tag;
+        this.exec('formatBlock', active ? '<p>' : '<' + tag + '>');
+        if (tag === 'blockquote' && active) this.unwrapBlockquote();
+    }
+
+    /** Some browsers leave the <blockquote> wrapper in place after formatBlock('<p>'); strip it manually if so. */
+    private unwrapBlockquote(): void {
+        const s = window.getSelection();
+        let node: Node | null = s && this.ed.contains(s.anchorNode) ? s.anchorNode : null;
+        while (node && node !== this.ed) {
+            if ((node as HTMLElement).nodeType === 1 && (node as HTMLElement).tagName === 'BLOCKQUOTE') {
+                const bq = node as HTMLElement;
+                const parent = bq.parentNode!;
+                while (bq.firstChild) parent.insertBefore(bq.firstChild, bq);
+                parent.removeChild(bq);
+                this.onChange();
+                return;
+            }
+            node = node.parentNode;
+        }
     }
 
     private clearSelToolbar(): void {
@@ -4144,6 +4187,11 @@ export class FableEditor implements FableEditorApi {
     private currentBlock(): string {
         const s = window.getSelection();
         if (!s || !s.anchorNode || !this.ed.contains(s.anchorNode)) return 'p';
+        let node: Node | null = s.anchorNode;
+        while (node && node !== this.ed) {
+            if ((node as HTMLElement).nodeType === 1 && (node as HTMLElement).tagName === 'BLOCKQUOTE') return 'blockquote';
+            node = node.parentNode;
+        }
         const b = this.closestBlock(s.anchorNode);
         return b ? b.tagName.toLowerCase().replace('div', 'p') : 'p';
     }
