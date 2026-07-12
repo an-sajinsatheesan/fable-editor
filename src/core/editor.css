@@ -301,6 +301,38 @@
                margin: 0 0 1em;
           }
 
+          .earea blockquote {
+               margin: 0 0 1em;
+               padding: 2px 20px 2px 44px;
+               border-left: 3px solid var(--fable-primary, #df3c2b);
+               position: relative;
+               font-style: italic;
+               color: #556;
+          }
+
+          .earea blockquote::before {
+               content: "\201C";
+               position: absolute;
+               left: 12px;
+               top: -6px;
+               font-family: Georgia, 'Times New Roman', serif;
+               font-style: normal;
+               font-size: 34px;
+               line-height: 1;
+               color: var(--fable-primary, #df3c2b);
+               opacity: .55;
+          }
+
+          .earea blockquote > :last-child::after {
+               content: "\201D";
+               font-family: Georgia, 'Times New Roman', serif;
+               font-style: normal;
+               font-size: 20px;
+               color: var(--fable-primary, #df3c2b);
+               opacity: .7;
+               margin-inline-start: 2px;
+          }
+
           .earea table {
                border-collapse: collapse;
           }
@@ -1036,6 +1068,8 @@
                justify-content: space-between;
                /* gap: 4px;
                padding: 6px; */
+                   border-radius: 5px;
+    overflow: hidden;
           }
 
           .cpal button {
