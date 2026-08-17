@@ -1053,7 +1053,7 @@
                transform: rotate(-90deg);
           }
 
-          [dir=rtl] .pop .mi .subarrow svg {
+          .pop[dir=rtl] .mi .subarrow svg {
                transform: rotate(90deg);
           }
 

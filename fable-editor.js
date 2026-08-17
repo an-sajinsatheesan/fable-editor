@@ -363,6 +363,11 @@ let openPop = null, popAnchor = null, openSubEl = null;
 function closeSub(){ openSubEl?.remove(); openSubEl=null; }
 function closePop(){ closeSub(); if(openPop){ openPop.remove(); openPop=null;
   popAnchor?.classList.remove('open'); popAnchor=null; } }
+/* an open menu/submenu is stuck at its open-time position, so a scroll
+   anywhere (page or a scrollable ancestor, hence capture:true) leaves it
+   visually detached from its anchor button - just close it, matching how
+   every other floating element on this page reacts to scroll */
+window.addEventListener('scroll', closePop, true);
 function openSubFor(item, anchor){
   closeSub();
   const sub = document.createElement('div');

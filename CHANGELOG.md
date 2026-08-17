@@ -3,6 +3,24 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.7]
+
+### Fixed
+
+- **Open toolbar/menubar dropdowns stayed anchored to their open-time screen
+  position while the page scrolled**, visually detaching from the button that
+  opened them. Every other floating element (table handles, image handles,
+  context toolbars) already repositions on scroll via a shared window-level
+  scroll listener; the menu popup was the one thing left out of it. It's now
+  closed on scroll, same as the rest.
+
+- **The RTL submenu arrow (the `›`/`‹` indicator on menu items with a
+  submenu, e.g. Templates) never flipped direction in the Arabic editor.**
+  The popup element gets `dir="rtl"` set directly on itself, but the CSS rule
+  read `[dir=rtl] .pop .mi .subarrow svg`, which only matches when `.pop` is
+  a *descendant* of a `dir="rtl"` element - never true here, since `.pop` is
+  the element carrying the attribute. Changed to `.pop[dir=rtl] .mi .subarrow svg`.
+
 ## [1.2.6]
 
 ### Fixed

@@ -531,6 +531,7 @@ export class FableEditor implements FableEditorApi {
         this.onWin(
             'scroll',
             () => {
+                this.closePop();
                 this.positionTableHandles();
                 this.positionImageHandles();
                 this.positionImgPhCtx();
