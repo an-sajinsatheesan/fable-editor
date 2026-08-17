@@ -219,4 +219,56 @@ describe('FableEditor core', () => {
       editor.destroy();
     });
   });
+
+  describe('getContentForEmail()', () => {
+    it('detects rtl from content when the editor language is en and no dir attribute is present', () => {
+      const editor = new FableEditor({ target: container, language: 'en' });
+      editor.setContent('<p>مرحبا بكم في هذا التقرير الشهري</p>');
+      const html = editor.getContentForEmail();
+      expect(html).toMatch(/^<div dir="rtl" style="direction:rtl;text-align:right">/);
+      expect(html).toContain('<p dir="rtl" style="direction:rtl;text-align:right">');
+      editor.destroy();
+    });
+
+    it('detects ltr from content when the editor language is ar and no dir attribute is present', () => {
+      const editor = new FableEditor({ target: container, language: 'ar' });
+      editor.setContent('<p>Hello team, please review the attached report.</p>');
+      const html = editor.getContentForEmail();
+      expect(html).toMatch(/^<div dir="ltr" style="direction:ltr;text-align:left">/);
+      expect(html).toContain('<p dir="ltr" style="direction:ltr;text-align:left">');
+      editor.destroy();
+    });
+
+    it('resolves each paragraph independently in mixed-direction content with no dir attributes', () => {
+      const editor = new FableEditor({ target: container, language: 'en' });
+      editor.setContent('<p>مرحبا بكم</p><p>Hello in English</p>');
+      const html = editor.getContentForEmail();
+      expect(html).toContain('<p dir="rtl" style="direction:rtl;text-align:right">مرحبا بكم</p>');
+      expect(html).toContain('<p dir="ltr" style="direction:ltr;text-align:left">Hello in English</p>');
+      editor.destroy();
+    });
+
+    it('keeps existing explicit dir/text-align untouched (regression: Word-style pasted content)', () => {
+      const editor = new FableEditor({ target: container, language: 'en' });
+      editor.setContent('<p dir="rtl" style="direction:rtl;text-align:center">مرحبا</p>');
+      const html = editor.getContentForEmail();
+      expect(html).toContain('<p dir="rtl" style="direction:rtl;text-align:center">مرحبا</p>');
+      editor.destroy();
+    });
+
+    it('falls back to the editor\'s own direction for content with no strong-direction character', () => {
+      const editor = new FableEditor({ target: container, language: 'ar' });
+      editor.setContent('<p>12345 - 67890</p>');
+      const html = editor.getContentForEmail();
+      expect(html).toMatch(/^<div dir="rtl" style="direction:rtl;text-align:right">/);
+      editor.destroy();
+    });
+
+    it('does not change getContent()\'s output', () => {
+      const editor = new FableEditor({ target: container, language: 'en' });
+      editor.setContent('<p>مرحبا بكم</p>');
+      expect(editor.getContent()).toBe('<p>مرحبا بكم</p>');
+      editor.destroy();
+    });
+  });
 });

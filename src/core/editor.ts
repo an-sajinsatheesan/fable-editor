@@ -94,6 +94,45 @@ function installTooltips(): void {
     addEventListener('scroll', hideTip, true);
 }
 
+/* ---------------------------------------------------------- email-export direction
+   detection — used only by getContentForEmail(). Content pasted from Word/Outlook
+   usually carries explicit dir="rtl"/"ltr" per paragraph, but plain-text paste
+   (normalizeTextPaste's dir="auto") and some other sources carry no reliable
+   explicit direction at all. For those blocks we fall back to a first-strong-
+   character scan (the same idea as HTML5's dir="auto") instead of the app's
+   configured UI language, which has nothing to do with what the pasted text
+   actually is. */
+const EMAIL_RTL_CHAR =
+    /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u0780-\u07BF\u08A0-\u08FF\uFB1D-\uFB4F\uFB50-\uFDFF\uFE70-\uFEFF]/;
+const EMAIL_STRONG_CHAR = /\p{L}/u;
+const EMAIL_BLOCK_SELECTOR = 'p,div,li,td,th,blockquote,h1,h2,h3,h4,h5,h6,pre,figcaption';
+
+function firstStrongDir(text: string): 'rtl' | 'ltr' | null {
+    for (const ch of text) {
+        if (EMAIL_RTL_CHAR.test(ch)) return 'rtl';
+        if (EMAIL_STRONG_CHAR.test(ch)) return 'ltr';
+    }
+    return null;
+}
+
+/* Text belonging to el itself, skipping subtrees rooted at a descendant that
+   already carries its own explicit rtl/ltr dir — that subtree's direction is
+   already independently decided and shouldn't sway el's own detection. */
+function ownText(el: Element): string {
+    let text = '';
+    el.childNodes.forEach((node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            text += node.nodeValue || '';
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const child = node as Element;
+            const d = (child.getAttribute('dir') || '').toLowerCase();
+            if (d === 'rtl' || d === 'ltr') return;
+            text += ownText(child);
+        }
+    });
+    return text;
+}
+
 export class FableEditor implements FableEditorApi {
     private static instanceCounter = 0;
 
@@ -635,8 +674,13 @@ export class FableEditor implements FableEditorApi {
      *  descendant that has no `text-align` of its own — even one with its own
      *  dir="rtl". Elements that already carry their own dir (preserved as-is by
      *  the paste engine) each get their own matching text-align only if they
-     *  don't already have one, so mixed-direction content and any alignment the
-     *  user explicitly set are left untouched. */
+     *  don't already have one. Blocks with no reliable explicit dir (missing, or
+     *  dir="auto" from plain-text paste) get their direction from a first-strong-
+     *  character scan of their own text instead of silently inheriting the
+     *  editor's configured UI language — mixed-direction content and any
+     *  alignment the user explicitly set are left untouched either way. Only
+     *  content with no strongly-directional character anywhere falls back to the
+     *  editor's current direction. */
     getContentForEmail(): string {
         const setStyle = (el: Element, decl: string): void => {
             const cur = (el.getAttribute('style') || '').trim();
@@ -645,6 +689,7 @@ export class FableEditor implements FableEditorApi {
         const box = document.createElement('div');
         box.innerHTML = this.ed.innerHTML;
         let found: 'rtl' | 'ltr' | null = null;
+
         box.querySelectorAll<HTMLElement>('[dir]').forEach((el) => {
             const raw = (el.getAttribute('dir') || '').toLowerCase();
             if (raw !== 'rtl' && raw !== 'ltr') return;
@@ -652,6 +697,18 @@ export class FableEditor implements FableEditorApi {
             if (!found) found = d;
             if (!/text-align\s*:/i.test(el.getAttribute('style') || '')) setStyle(el, `text-align:${d === 'rtl' ? 'right' : 'left'}`);
         });
+
+        box.querySelectorAll<HTMLElement>(EMAIL_BLOCK_SELECTOR).forEach((el) => {
+            const raw = (el.getAttribute('dir') || '').toLowerCase();
+            if (raw === 'rtl' || raw === 'ltr') return;
+            const d = firstStrongDir(ownText(el));
+            if (!d) return;
+            if (!found) found = d;
+            el.setAttribute('dir', d);
+            const hasAlign = /text-align\s*:/i.test(el.getAttribute('style') || '');
+            setStyle(el, hasAlign ? `direction:${d}` : `direction:${d};text-align:${d === 'rtl' ? 'right' : 'left'}`);
+        });
+
         const dir: 'rtl' | 'ltr' = found || (this.ed.getAttribute('dir') as 'rtl' | 'ltr' | null) || this.dir();
         box.querySelectorAll('table:not([dir])').forEach((tbl) => {
             tbl.setAttribute('dir', dir);
