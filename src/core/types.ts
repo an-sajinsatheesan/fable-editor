@@ -74,6 +74,7 @@ export interface EditorInitOptions {
 
 export interface FableEditorApi {
   getContent(): string;
+  getContentForEmail(): string;
   setContent(html: string): void;
   insertContent(html: string): void;
   setLanguage(lang: EditorLanguage): void;

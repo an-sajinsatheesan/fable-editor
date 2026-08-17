@@ -629,6 +629,38 @@ export class FableEditor implements FableEditorApi {
         return this.ed.innerHTML;
     }
 
+    /** Same HTML as getContent(), wrapped so its RTL/LTR direction survives being
+     *  dropped into a fixed-alignment host (e.g. an email template's
+     *  `<td align="left">`), which otherwise forces left alignment onto any
+     *  descendant that has no `text-align` of its own — even one with its own
+     *  dir="rtl". Elements that already carry their own dir (preserved as-is by
+     *  the paste engine) each get their own matching text-align only if they
+     *  don't already have one, so mixed-direction content and any alignment the
+     *  user explicitly set are left untouched. */
+    getContentForEmail(): string {
+        const setStyle = (el: Element, decl: string): void => {
+            const cur = (el.getAttribute('style') || '').trim();
+            el.setAttribute('style', cur ? cur.replace(/;?$/, '; ') + decl : decl);
+        };
+        const box = document.createElement('div');
+        box.innerHTML = this.ed.innerHTML;
+        let found: 'rtl' | 'ltr' | null = null;
+        box.querySelectorAll<HTMLElement>('[dir]').forEach((el) => {
+            const raw = (el.getAttribute('dir') || '').toLowerCase();
+            if (raw !== 'rtl' && raw !== 'ltr') return;
+            const d = raw as 'rtl' | 'ltr';
+            if (!found) found = d;
+            if (!/text-align\s*:/i.test(el.getAttribute('style') || '')) setStyle(el, `text-align:${d === 'rtl' ? 'right' : 'left'}`);
+        });
+        const dir: 'rtl' | 'ltr' = found || (this.ed.getAttribute('dir') as 'rtl' | 'ltr' | null) || this.dir();
+        box.querySelectorAll('table:not([dir])').forEach((tbl) => {
+            tbl.setAttribute('dir', dir);
+            if (!/direction\s*:/i.test(tbl.getAttribute('style') || '')) setStyle(tbl, `direction:${dir}`);
+        });
+        const align = dir === 'rtl' ? 'right' : 'left';
+        return `<div dir="${dir}" style="direction:${dir};text-align:${align}">${box.innerHTML}</div>`;
+    }
+
     setContent(html: string): void {
         this.ed.innerHTML = html || '<p><br></p>';
         this.refreshState();

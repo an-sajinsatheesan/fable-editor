@@ -82,6 +82,10 @@ export class FableEditorComponent implements OnInit, OnChanges, OnDestroy {
     return this.editor?.getContent() ?? '';
   }
 
+  getContentForEmail(): string {
+    return this.editor?.getContentForEmail() ?? '';
+  }
+
   setContent(html: string): void {
     this.lastContent = html;
     this.editor?.setContent(html ?? '');

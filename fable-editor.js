@@ -2210,6 +2210,37 @@ function onChange(){
 window.getContent = ()=>ed.innerHTML;
 window.setContent = h=>{ ed.innerHTML=h||'<p><br></p>'; refreshState(); clearTableHandles(); };
 
+/* Same HTML as getContent(), wrapped so its RTL/LTR direction survives being
+   dropped into a fixed-alignment host (e.g. an email template's
+   <td align="left">), which otherwise forces left alignment onto any
+   descendant that has no text-align of its own - even one with its own
+   dir="rtl". Elements that already carry their own dir (preserved as-is by
+   the paste engine) each get their own matching text-align only if they
+   don't already have one, so mixed-direction content and any alignment the
+   user explicitly set are left untouched. */
+window.getContentForEmail = function(){
+  const setStyle=(el,decl)=>{
+    const cur=(el.getAttribute('style')||'').trim();
+    el.setAttribute('style', cur ? cur.replace(/;?$/,'; ')+decl : decl);
+  };
+  const box=document.createElement('div');
+  box.innerHTML=ed.innerHTML;
+  let found=null;
+  box.querySelectorAll('[dir]').forEach(el=>{
+    const d=(el.getAttribute('dir')||'').toLowerCase();
+    if(d!=='rtl'&&d!=='ltr') return;
+    if(!found) found=d;
+    if(!/text-align\s*:/i.test(el.getAttribute('style')||'')) setStyle(el, `text-align:${d==='rtl'?'right':'left'}`);
+  });
+  const dir = found || ed.getAttribute('dir') || t('dir');
+  box.querySelectorAll('table:not([dir])').forEach(tbl=>{
+    tbl.setAttribute('dir',dir);
+    if(!/direction\s*:/i.test(tbl.getAttribute('style')||'')) setStyle(tbl, `direction:${dir}`);
+  });
+  const align = dir==='rtl' ? 'right' : 'left';
+  return `<div dir="${dir}" style="direction:${dir};text-align:${align}">${box.innerHTML}</div>`;
+};
+
 /* =====================================================================
    POWERPASTE ENGINE  (Word / Google Docs / Excel clean paste)
    ===================================================================== */

@@ -25,6 +25,7 @@ export const FableEditor = forwardRef<FableEditorApi, FableEditorProps>(
 
     useImperativeHandle(ref, () => ({
       getContent: () => editorRef.current?.getContent() ?? '',
+      getContentForEmail: () => editorRef.current?.getContentForEmail() ?? '',
       setContent: (html: string) => editorRef.current?.setContent(html),
       insertContent: (html: string) => editorRef.current?.insertContent(html),
       setLanguage: (lang: EditorLanguage) => editorRef.current?.setLanguage(lang),
