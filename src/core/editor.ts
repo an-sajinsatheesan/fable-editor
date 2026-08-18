@@ -167,7 +167,12 @@ export class FableEditor implements FableEditorApi {
     private backColor = '#FACC15';
 
     private openPop: HTMLElement | null = null;
-    private openSubEl: HTMLElement | null = null;
+    /** Stack of currently-open flyout submenus, shallowest first (e.g. for
+     *  Table > Cell > Cell background: [Cell flyout, Cell background flyout]).
+     *  A single slot isn't enough past one level deep - opening a 2nd-level
+     *  flyout would remove the 1st-level one still needed to bridge visually
+     *  back to the top-level popup, leaving a gap. */
+    private subStack: HTMLElement[] = [];
     private popAnchor: HTMLElement | null = null;
     private dlgOvl: HTMLElement | null = null;
 
@@ -383,7 +388,7 @@ export class FableEditor implements FableEditorApi {
                 this.openPop &&
                 !this.openPop.contains(e.target as Node) &&
                 !this.popAnchor!.contains(e.target as Node) &&
-                !(this.openSubEl && this.openSubEl.contains(e.target as Node))
+                !this.subContains(e.target as Node)
             ) {
                 this.closePop();
             }
@@ -530,8 +535,16 @@ export class FableEditor implements FableEditorApi {
         });
         this.onWin(
             'scroll',
-            () => {
-                this.closePop();
+            (e) => {
+                /* this fires for ANY scroll in the document (capture:true is what
+                   lets it catch a scrollable ancestor, not just the window) -
+                   including the popup's own overflow:auto scrolling through a long
+                   menu. Only close it for a scroll that happened outside the open
+                   menu/flyouts; otherwise scrolling a long dropdown would close it
+                   on the very first scroll tick instead of scrolling its content. */
+                const t = e.target;
+                const withinOpenMenu = t instanceof Node && ((this.openPop?.contains(t) ?? false) || this.subContains(t));
+                if (!withinOpenMenu) this.closePop();
                 this.positionTableHandles();
                 this.positionImageHandles();
                 this.positionImgPhCtx();
@@ -627,7 +640,7 @@ export class FableEditor implements FableEditorApi {
                 (this.vidCtx && this.vidCtx.contains(e.target as Node)) ||
                 (this.codeCtx && this.codeCtx.contains(e.target as Node)) ||
                 (this.openPop && this.openPop.contains(e.target as Node)) ||
-                (this.openSubEl && this.openSubEl.contains(e.target as Node))
+                this.subContains(e.target as Node)
             )
                 return;
             this.clearTableHandles();
@@ -975,8 +988,29 @@ export class FableEditor implements FableEditorApi {
 
     /* ---------------------------------------------------------- popups / menus */
     private closeSub(): void {
-        this.openSubEl?.remove();
-        this.openSubEl = null;
+        this.closeSubFrom(0);
+    }
+
+    /** Removes stacked flyouts from `level` (0 = shallowest) onward, keeping
+     *  anything shallower - e.g. hovering a sibling item inside the "Cell"
+     *  flyout should drop a deeper "Cell background" flyout but keep "Cell"
+     *  itself and the top-level popup it bridges to. */
+    private closeSubFrom(level: number): void {
+        while (this.subStack.length > level) this.subStack.pop()!.remove();
+    }
+
+    /** True if `node` is inside any currently-open flyout submenu (any depth). */
+    private subContains(node: Node): boolean {
+        return this.subStack.some((el) => el.contains(node));
+    }
+
+    /** 0 for the top-level popup itself; otherwise this container's depth in
+     *  the flyout stack + 1. Used to know how many deeper flyouts to close
+     *  when opening or hovering within `container`. */
+    private subLevelOf(container: HTMLElement): number {
+        if (container === this.openPop) return 0;
+        const idx = this.subStack.indexOf(container);
+        return idx === -1 ? this.subStack.length : idx + 1;
     }
 
     private closePop(): void {
@@ -993,7 +1027,17 @@ export class FableEditor implements FableEditorApi {
     }
 
     private openSubFor(item: MenuItemDef, anchor: HTMLElement): void {
-        this.closeSub();
+        /* captured before truncating the stack - for a flyout nested inside
+           another flyout (e.g. Table > Cell > Cell background), anchor is itself
+           a descendant of the currently-open sub-popup; measuring after removing
+           it would read a detached, zeroed-out rect and land the new flyout at
+           the top-left corner of the screen */
+        const r = anchor.getBoundingClientRect();
+        /* only close flyouts deeper than the one anchor lives in - closing
+           everything (the old behavior) would also remove that same containing
+           flyout, leaving a visual gap back to the top-level popup */
+        const parentPop = anchor.closest('.pop') as HTMLElement | null;
+        this.closeSubFrom(parentPop ? this.subLevelOf(parentPop) : 0);
         const sub = document.createElement('div');
         sub.className = 'pop sub';
         sub.dir = this.dir();
@@ -1003,7 +1047,6 @@ export class FableEditor implements FableEditorApi {
             if ((e.target as HTMLElement).tagName !== 'INPUT') e.preventDefault();
         });
         document.body.appendChild(sub);
-        const r = anchor.getBoundingClientRect();
         const isRtl = this.dir() === 'rtl';
         // overlap the parent item slightly so the pointer can travel into the flyout
         let x = isRtl ? r.left - sub.offsetWidth + 2 : r.right - 2;
@@ -1012,7 +1055,7 @@ export class FableEditor implements FableEditorApi {
         y = Math.max(8 + scrollY, Math.min(y, scrollY + innerHeight - sub.offsetHeight - 8));
         sub.style.left = x + 'px';
         sub.style.top = y + 'px';
-        this.openSubEl = sub;
+        this.subStack.push(sub);
     }
 
     private popup(anchor: HTMLElement, build: (el: HTMLElement) => void, cls?: string): void {
@@ -1029,7 +1072,11 @@ export class FableEditor implements FableEditorApi {
         const r = anchor.getBoundingClientRect();
         // align the menu with its control: at least as wide as the anchor
         el.style.minWidth = Math.max(160, Math.round(r.width)) + 'px';
-        el.style.top = r.bottom + scrollY + 2 + 'px';
+        // clamp so a long menu (its own max-height/overflow makes it scrollable)
+        // stays fully on-screen instead of running off the bottom of the viewport
+        let y = r.bottom + scrollY + 2;
+        y = Math.max(8 + scrollY, Math.min(y, scrollY + innerHeight - el.offsetHeight - 8));
+        el.style.top = y + 'px';
         const isRtl = this.dir() === 'rtl';
         let x = isRtl ? r.right - el.offsetWidth : r.left;
         x = Math.max(8, Math.min(x + scrollX, scrollX + innerWidth - el.offsetWidth - 8));
@@ -1061,7 +1108,10 @@ export class FableEditor implements FableEditorApi {
             });
             b.addEventListener('mouseenter', () => {
                 if (hasSub) this.openSubFor(it, b);
-                else if (this.openSubEl && el !== this.openSubEl) this.closeSub();
+                /* hovering a no-submenu item drops whatever deeper flyout was open
+                   from a previously-hovered sibling, but keeps el itself and any
+                   shallower ancestors intact */
+                else this.closeSubFrom(this.subLevelOf(el));
                 it.hover?.(true);
             });
             b.addEventListener('mouseleave', () => it.hover?.(false));
@@ -1671,8 +1721,8 @@ export class FableEditor implements FableEditorApi {
     private buildToolbarRegistry(): Record<string, () => HTMLElement | HTMLElement[]> {
         const tableBtn = this.tbtn(IC.tableic, this.t('quicktable'), () => this.tableGrid(tableBtn));
         const registry: Record<string, () => HTMLElement | HTMLElement[]> = {
-            undo: () => this.tbtn(IC.undo, this.t('undo'), () => this.exec('undo')),
-            redo: () => this.tbtn(IC.redo, this.t('redo'), () => this.exec('redo')),
+            undo: () => this.tbtn(IC.undo, this.t('undo'), () => this.exec('undo'), 'undo'),
+            redo: () => this.tbtn(IC.redo, this.t('redo'), () => this.exec('redo'), 'redo'),
             preview: () => this.tbtn(IC.prevw, this.t('preview'), () => this.previewDlg()),
             print: () => this.tbtn(IC.printic, this.t('print'), () => this.printDoc()),
             importword: () => this.tbtn(IC.wordic, this.t('importword'), () => this.pickWordDoc()),

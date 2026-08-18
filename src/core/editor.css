@@ -194,6 +194,14 @@
                stroke-linejoin: round;
           }
 
+          /* undo/redo swap sides under dir=rtl (normal flex reordering of the
+             toolbar), but their glyphs stay fixed - without this, both arrows end
+             up pointing at each other instead of outward from their new position */
+          [dir=rtl] .tbtn[data-id=undo] svg,
+          [dir=rtl] .tbtn[data-id=redo] svg {
+               transform: scaleX(-1);
+          }
+
           .tbtn svg .f {
                fill: #2f3744;
                stroke: none;
@@ -1711,8 +1719,13 @@
                color: #556;
           }
 
-          kbd {
+          /* scoped (not a bare kbd selector) and with its own explicit color -
+             a host page's own kbd styling can otherwise out-specificity a bare
+             tag selector and override just one of background/color, leaving
+             light-on-light text */
+          .dlg kbd {
                background: #f3f4f6;
+               color: #444c58;
                border-radius: 4px;
                padding: 2px 7px;
                font: 12px Consolas, monospace;

@@ -359,24 +359,62 @@ function selectedBlocks(){
 }
 
 /* ---------------------------------------------------------- popups */
-let openPop = null, popAnchor = null, openSubEl = null;
-function closeSub(){ openSubEl?.remove(); openSubEl=null; }
+let openPop = null, popAnchor = null;
+/* Stack of currently-open flyout submenus, shallowest first (e.g. for
+   Table > Cell > Cell background: [Cell flyout, Cell background flyout]).
+   A single slot isn't enough past one level deep - opening a 2nd-level
+   flyout would remove the 1st-level one still needed to bridge visually
+   back to the top-level popup, leaving a gap. */
+let subStack = [];
+function closeSub(){ closeSubFrom(0); }
+/* Removes stacked flyouts from `level` (0 = shallowest) onward, keeping
+   anything shallower - e.g. hovering a sibling item inside the "Cell"
+   flyout should drop a deeper "Cell background" flyout but keep "Cell"
+   itself and the top-level popup it bridges to. */
+function closeSubFrom(level){ while(subStack.length > level) subStack.pop().remove(); }
+/* True if `node` is inside any currently-open flyout submenu (any depth). */
+function subContains(node){ return subStack.some(el => el.contains(node)); }
+/* 0 for the top-level popup itself; otherwise this container's depth in the
+   flyout stack + 1. Used to know how many deeper flyouts to close when
+   opening or hovering within `container`. */
+function subLevelOf(container){
+  if(container===openPop) return 0;
+  const idx = subStack.indexOf(container);
+  return idx===-1 ? subStack.length : idx+1;
+}
 function closePop(){ closeSub(); if(openPop){ openPop.remove(); openPop=null;
   popAnchor?.classList.remove('open'); popAnchor=null; } }
 /* an open menu/submenu is stuck at its open-time position, so a scroll
    anywhere (page or a scrollable ancestor, hence capture:true) leaves it
    visually detached from its anchor button - just close it, matching how
-   every other floating element on this page reacts to scroll */
-window.addEventListener('scroll', closePop, true);
+   every other floating element on this page reacts to scroll. But this fires
+   for ANY scroll in the document, including the popup's own overflow:auto
+   scrolling through a long menu - only close it for a scroll that happened
+   outside the open menu/flyouts, otherwise scrolling a long dropdown closes
+   it on the first scroll tick instead of scrolling its content. */
+window.addEventListener('scroll', e=>{
+  const t = e.target;
+  const withinOpenMenu = t instanceof Node && ((openPop && openPop.contains(t)) || subContains(t));
+  if(!withinOpenMenu) closePop();
+}, true);
 function openSubFor(item, anchor){
-  closeSub();
+  /* captured before truncating the stack - for a flyout nested inside another
+     flyout (e.g. Table > Cell > Cell background), anchor is itself a
+     descendant of the currently-open sub-popup; measuring after removing it
+     would read a detached, zeroed-out rect and land the new flyout at the
+     top-left corner of the screen */
+  const r = anchor.getBoundingClientRect();
+  /* only close flyouts deeper than the one anchor lives in - closing
+     everything (the old behavior) would also remove that same containing
+     flyout, leaving a visual gap back to the top-level popup */
+  const parentPop = anchor.closest('.pop');
+  closeSubFrom(parentPop ? subLevelOf(parentPop) : 0);
   const sub = document.createElement('div');
   sub.className = 'pop sub'; sub.dir = t('dir');
   if(item.subBuild) item.subBuild(sub);
   else if(item.sub) menuItems(sub, item.sub);
   sub.addEventListener('mousedown', e=>{ if(e.target.tagName!=='INPUT') e.preventDefault(); });
   document.body.appendChild(sub);
-  const r = anchor.getBoundingClientRect();
   const isRtl = t('dir')==='rtl';
   /* overlap the parent item slightly so the pointer can travel into the flyout */
   let x = isRtl ? r.left - sub.offsetWidth + 2 : r.right - 2;
@@ -384,7 +422,7 @@ function openSubFor(item, anchor){
   let y = r.top + scrollY - 6;
   y = Math.max(8 + scrollY, Math.min(y, scrollY + innerHeight - sub.offsetHeight - 8));
   sub.style.left = x + 'px'; sub.style.top = y + 'px';
-  openSubEl = sub;
+  subStack.push(sub);
 }
 function popup(anchor, build, cls){
   if(openPop && popAnchor === anchor){ closePop(); return; }
@@ -394,7 +432,11 @@ function popup(anchor, build, cls){
   build(el);
   document.body.appendChild(el);
   const r = anchor.getBoundingClientRect();
-  el.style.top = (r.bottom + scrollY + 2) + 'px';
+  /* clamp so a long menu (its own max-height/overflow makes it scrollable)
+     stays fully on-screen instead of running off the bottom of the viewport */
+  let y = r.bottom + scrollY + 2;
+  y = Math.max(8 + scrollY, Math.min(y, scrollY + innerHeight - el.offsetHeight - 8));
+  el.style.top = y + 'px';
   const isRtl = t('dir')==='rtl';
   let x = isRtl ? r.right - el.offsetWidth : r.left;
   x = Math.max(8, Math.min(x + scrollX, scrollX + innerWidth - el.offsetWidth - 8));
@@ -404,7 +446,7 @@ function popup(anchor, build, cls){
 }
 document.addEventListener('mousedown', e=>{
   if(openPop && !openPop.contains(e.target) && !popAnchor.contains(e.target)
-     && !(openSubEl && openSubEl.contains(e.target))) closePop();
+     && !subContains(e.target)) closePop();
 });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closePop(); closeDlg(); }});
 
@@ -469,7 +511,10 @@ function menuItems(el, items){
     b.addEventListener('click', ()=>{ if(!it.action) return; closePop(); it.action(); });
     b.addEventListener('mouseenter', ()=>{
       if(hasSub) openSubFor(it, b);
-      else if(openSubEl && el!==openSubEl) closeSub();
+      /* hovering a no-submenu item drops whatever deeper flyout was open from
+         a previously-hovered sibling, but keeps el itself and any shallower
+         ancestors intact */
+      else closeSubFrom(subLevelOf(el));
     });
     el.appendChild(b);
   });
@@ -662,8 +707,8 @@ function setDir(dir){
 function buildToolbar(){
   toolbar.innerHTML='';
   toolbar.append(
-    group( tbtn(IC.undo,t('undo'),()=>exec('undo')),
-           tbtn(IC.redo,t('redo'),()=>exec('redo')) ),
+    group( tbtn(IC.undo,t('undo'),()=>exec('undo'),'undo'),
+           tbtn(IC.redo,t('redo'),()=>exec('redo'),'redo') ),
     group( tbtn(IC.ltr,t('ltr'),()=>setDir('ltr'),'ltr'),
            tbtn(IC.rtl,t('rtl'),()=>setDir('rtl'),'rtl') ),
     group( tbtn(TXT('<b class="sans">B</b>'),t('bold'),()=>exec('bold'),'bold'),
