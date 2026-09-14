@@ -3,6 +3,34 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.2]
+
+### Fixed
+
+- **A cropped picture pasted from Word disappeared entirely.** Cropping makes
+  Word turn on `RelyOnVML`, and it then describes the picture only as a VML
+  `<v:shape>` around a `<v:imagedata src="file:///.../clip_image001.png">` -
+  either inside a downlevel-hidden `<!--[if gte vml 1]>` comment or as live
+  markup - omitting the plain `<img>` fallback it normally writes alongside.
+  The paste engine drops conditional comments and does not understand VML, so
+  the picture recovered from the RTF flavor (added in 1.3.0) had no `<img>` tag
+  left to land on and the paste lost it silently. `unwrapVmlImages()` now gives
+  such a shape the `<img>` Word withheld, carrying over the shape's `style`
+  width and height (converted from `pt` to `px`) so the picture keeps the size
+  it had in the document. A shape whose `src` already matches an `<img>` in the
+  same paste is left alone, so a picture that does have its fallback is not
+  duplicated. The shape's `croptop`/`cropbottom` attributes are not applied:
+  the picture comes in uncropped.
+
+- **Every picture recovered from the RTF flavor could lose its leading bytes.**
+  `decodePict()` stripped nested property groups and control words by deleting
+  them outright, which glued whatever surrounded them together. Word ends a
+  picture header with `\bliptagN{\*\blipuid ...}` hard against the hex payload,
+  so removing the uid group let the `\bliptag` parameter's `\d*` run straight
+  on into the hex and eat its first digits (`89504e47...` became `e470...`),
+  corrupting the picture with no error at all. Both removals now leave a space
+  behind.
+
 ## [1.3.1]
 
 ### Fixed

@@ -69,6 +69,15 @@ describe('extractRtfImages', () => {
   it('returns nothing for RTF without pictures', () => {
     expect(extractRtfImages(rtfDoc('\\par plain text\\par'))).toEqual([]);
   });
+
+  it('keeps the leading bytes when a \\bliptag uid group abuts the payload', () => {
+    /* Word's own header: {\*\blipuid …} sits hard against the hex, so removing it
+       must not let \bliptag's numeric parameter run on into 89504e47… */
+    const asWordWritesIt =
+      `{\\*\\shppict{\\pict{\\*\\picprop\\shplid1025}\\pngblip\\picw417\\pich125` +
+      `\\bliptag-1141652157{\\*\\blipuid bbe19bc3aa11223344556677}${base64ToHex(PNG_1x1)}}}`;
+    expect(extractRtfImages(rtfDoc(asWordWritesIt))).toEqual(['data:image/png;base64,' + PNG_1x1]);
+  });
 });
 
 describe('injectRtfImages', () => {
@@ -182,5 +191,68 @@ describe('paste pipeline end to end', () => {
     const out = cleanPastedHTML(injectRtfImages(wordHtml, '').html, 'ltr');
     expect(out).toContain('[local image — paste it separately]');
     expect(out).not.toMatch(/<img/);
+  });
+
+  /* A cropped picture makes Word turn RelyOnVML on: it then describes the picture
+     only as a VML shape inside a conditional comment, with no <img> fallback. */
+  const vmlOnlyHtml =
+    `<html xmlns:v="urn:schemas-microsoft-com:vml"><body>` +
+    `<p class=MsoNormal>Before the picture</p>` +
+    `<p class=MsoNormal><!--[if gte vml 1]><v:shape id="Picture_x0020_1" ` +
+    `style='width:312.75pt;height:152.25pt'><v:imagedata ` +
+    `src="file:///C:/Users/x/AppData/Local/Temp/msohtmlclip1/01/clip_image001.png" ` +
+    `o:title="" croptop="5120f" cropbottom="3605f"/></v:shape><![endif]--></p>` +
+    `<p class=MsoNormal>After the picture</p></body></html>`;
+
+  it('recovers a picture Word described only as a VML shape', () => {
+    const res = injectRtfImages(vmlOnlyHtml, rtfDoc(pngPict));
+    expect(res.injected).toEqual(['data:image/png;base64,' + PNG_1x1]);
+    const out = cleanPastedHTML(res.html, 'ltr');
+    expect(out).toMatch(/<img[^>]+src="data:image\/png;base64,/);
+    expect(out).toContain('width="417"'); /* 312.75pt */
+    expect(out).toContain('height="203"'); /* 152.25pt */
+    expect(out).not.toContain('[local image');
+  });
+
+  /* …and with RelyOnVML it writes that shape as live markup instead, inside a
+     downlevel-revealed conditional the parser drops. */
+  const vmlLiveHtml =
+    `<html xmlns:v="urn:schemas-microsoft-com:vml"><head>` +
+    `<!--[if !mso]><style>v\\:* {behavior:url(#default#VML);}</style><![endif]-->` +
+    `<!--[if gte mso 9]><xml><o:OfficeDocumentSettings><o:RelyOnVML/></o:OfficeDocumentSettings></xml><![endif]-->` +
+    `</head><body><p class=MsoNormal>Before the picture</p>` +
+    `<p class=MsoNormal><![if gte vml 1]><v:shapetype id="_x0000_t75" coordsize="21600,21600" ` +
+    `o:spt="75"><v:stroke joinstyle="miter"/></v:shapetype>` +
+    `<v:shape id="Picture_x0020_1" o:spid="_x0000_i1025" type="#_x0000_t75" ` +
+    `style='width:312.75pt;height:152.25pt;visibility:visible;mso-wrap-style:square'>` +
+    `<v:imagedata src="file:///C:/Users/x/AppData/Local/Temp/msohtmlclip1/01/clip_image001.png" ` +
+    `o:title="" croptop="5120f" cropbottom="3605f"/></v:shape><![endif]></p>` +
+    `<p class=MsoNormal>After the picture</p></body></html>`;
+
+  it('recovers a picture Word wrote as a live VML shape (RelyOnVML)', () => {
+    const res = injectRtfImages(vmlLiveHtml, rtfDoc(pngPict));
+    expect(res.injected).toEqual(['data:image/png;base64,' + PNG_1x1]);
+    const out = cleanPastedHTML(res.html, 'ltr');
+    expect(out).toMatch(/<img[^>]+src="data:image\/png;base64,/);
+    expect(out).toContain('width="417"');
+    expect(out).toContain('height="203"');
+    expect(out).not.toContain('[local image');
+  });
+
+  it('recovers a bare <v:imagedata> with no shape around it', () => {
+    const bare = vmlLiveHtml.replace(/<v:shape\b[^>]*>/i, '').replace('</v:shape>', '');
+    const out = cleanPastedHTML(injectRtfImages(bare, rtfDoc(pngPict)).html, 'ltr');
+    expect(out).toMatch(/<img[^>]+src="data:image\/png;base64,/);
+  });
+
+  it('does not duplicate the picture when Word also wrote the <img> fallback', () => {
+    const both =
+      vmlOnlyHtml.replace(
+        '<![endif]-->',
+        `<![endif]--><![if !vml]>${wordImg('clip_image001.png', 'width=417 height=125 ')}<![endif]>`
+      );
+    const out = cleanPastedHTML(injectRtfImages(both, rtfDoc(pngPict)).html, 'ltr');
+    expect(out.match(/<img/g)).toHaveLength(1);
+    expect(out).toContain('height="125"'); /* the fallback's size, not the shape's */
   });
 });

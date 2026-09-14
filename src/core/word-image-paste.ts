@@ -85,9 +85,14 @@ function decodePict(body: string): string | null {
   else if (/\\wmetafile\d*/.test(body) || /\\emfblip/.test(body)) kind = 'metafile';
   if (!kind) return null;
 
+  /* Each removal leaves a space behind. Deleting outright would glue what surrounded
+     it together, and Word ends the picture header with `\bliptagN{\*\blipuid …}`
+     hard against the payload: dropping the uid group would let the \bliptag
+     parameter's `\d*` run straight on into the hex and eat its leading digits
+     (89504e47… -> e470…), which silently corrupts every picture Word sends. */
   let hex = body
-    .replace(/\{[^{}]*\}/g, '') // nested property groups
-    .replace(/\\[a-z]+-?\d*\s?/gi, '') // control words
+    .replace(/\{[^{}]*\}/g, ' ') // nested property groups
+    .replace(/\\[a-z]+-?\d*\s?/gi, ' ') // control words
     .replace(/[^0-9a-fA-F]/g, '');
   if (hex.length % 2) hex = hex.slice(0, -1);
   if (!hex) return null;
@@ -136,6 +141,75 @@ export interface InjectResult {
   injected: string[];
 }
 
+/** CSS length -> px, so a VML shape's size survives as the <img> width/height the
+ *  paste engine allows. Unknown units are left for the caller to skip. */
+function cssPx(value: string): number | null {
+  const m = value.match(/^\s*(-?[\d.]+)\s*(pt|px|in|cm|mm)?\s*$/i);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  if (!isFinite(n) || n <= 0) return null;
+  const unit = (m[2] || 'px').toLowerCase();
+  const px =
+    unit === 'pt' ? (n * 4) / 3 : unit === 'in' ? n * 96 : unit === 'cm' ? (n * 96) / 2.54 : unit === 'mm' ? (n * 96) / 25.4 : n;
+  return Math.round(px);
+}
+
+function attrOf(tag: string, name: string): string {
+  const m = tag.match(new RegExp('\\s' + name + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|([^\\s>]+))', 'i'));
+  return m ? m[1] ?? m[2] ?? m[3] ?? '' : '';
+}
+
+/** Word describes a picture twice: as a VML shape inside a downlevel-hidden
+ *  conditional comment, and as a plain <img> fallback after it. With RelyOnVML on —
+ *  which is what a cropped picture gets — it writes only the shape, and the paste
+ *  engine drops conditional comments, so the picture has no tag left to land on and
+ *  disappears. Give those shapes the <img> Word withheld, keeping the shape's size.
+ *  Pictures that do have the fallback are recognised by their src and left alone.
+ *
+ *  The shape's crop attributes are not applied: the picture appears uncropped. */
+export function unwrapVmlImages(html: string): string {
+  if (!/<v:imagedata\b/i.test(html)) return html;
+
+  /** The <img> Word withheld, or null when it did supply one (recognised by its src)
+   *  and the shape is therefore only the duplicate description of the same picture.
+   *  `sizing` is whatever markup the shape's style attribute can be read from. */
+  const imgFor = (imagedata: string, sizing: string): string | null => {
+    const src = attrOf(imagedata, 'src');
+    if (!src) return null;
+    const quoted = src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp('<img\\b[^>]*\\bsrc\\s*=\\s*["\']?' + quoted, 'i').test(html)) return null;
+    const style = (sizing.match(/<v:shape\b[^>]*\sstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/i) || []).slice(1).find(Boolean) || '';
+    const w = cssPx((style.match(/(?:^|;)\s*width\s*:\s*([^;]+)/i) || [])[1] || '');
+    const h = cssPx((style.match(/(?:^|;)\s*height\s*:\s*([^;]+)/i) || [])[1] || '');
+    return (
+      '<img src="' +
+      src.replace(/"/g, '&quot;') +
+      '"' +
+      (w ? ' width="' + w + '"' : '') +
+      (h ? ' height="' + h + '"' : '') +
+      '>'
+    );
+  };
+
+  /* Downlevel-hidden shape: an <img> put inside would stay inside a comment and never
+     reach the DOM, so the whole block has to go. */
+  let out = html.replace(/<!--\[if [^\]]*\]>([\s\S]*?)<!\[endif\]-->/gi, (block, inner: string) => {
+    const data = inner.match(/<v:imagedata\b[^>]*>/i);
+    return (data && imgFor(data[0], inner)) || block;
+  });
+
+  /* Live shape: with RelyOnVML on, Word writes the shape into the document itself
+     (bare, or inside a downlevel-revealed <![if gte vml 1]> that the parser drops),
+     counting on the v\:*{behavior:url(#default#VML)} rule it ships in <head>. */
+  out = out.replace(/<v:shape\b[^>]*>[\s\S]*?<\/v:shape\s*>/gi, (shape) => {
+    const data = shape.match(/<v:imagedata\b[^>]*>/i);
+    return (data && imgFor(data[0], shape)) || shape;
+  });
+
+  /* An imagedata with no shape left to take its size from. */
+  return out.replace(/<v:imagedata\b[^>]*>/gi, (data) => imgFor(data, '') || data);
+}
+
 /** Rewrites unusable <img src> values in raw pasted HTML with the pictures given, in
  *  document order. Images that already have a usable src are left alone and do not
  *  consume a slot, so a mixed paste (webmail image + Word image) stays aligned.
@@ -144,7 +218,7 @@ export function injectImages(html: string, imgs: RtfImages): InjectResult {
   if (!html || !imgs.length) return { html, injected: [] };
   const injected: string[] = [];
   let next = 0;
-  const out = html.replace(/<img\b[^>]*>/gi, (tag) => {
+  const out = unwrapVmlImages(html).replace(/<img\b[^>]*>/gi, (tag) => {
     const src = (tag.match(/\ssrc\s*=\s*["']?([^"'\s>]+)/i) || [])[1] || '';
     if (USABLE_SRC.test(src)) return tag;
     const data = imgs[next++];
