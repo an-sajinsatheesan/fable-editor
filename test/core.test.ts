@@ -220,6 +220,107 @@ describe('FableEditor core', () => {
     });
   });
 
+  describe('getContentForEmail() table borders', () => {
+    /* Word writes a cell's borders as three parallel longhands. Mail pipelines
+       allowlist CSS property by property, and one that keeps border-color and
+       border-width but drops border-style leaves a cell with no border at all,
+       because the initial border-style is none. */
+    const dropStyleLonghands = (html: string) =>
+      html.replace(/style="([^"]*)"/g, (_m, css: string) => {
+        const kept = css
+          .split(';')
+          .map((d) => d.trim())
+          .filter((d) => d && !/^(border-style|border-collapse|box-sizing)\s*:/i.test(d));
+        return kept.length ? `style="${kept.join(';')}"` : '';
+      });
+
+    it('rewrites Word border longhands as per-side shorthands that survive a css allowlist', () => {
+      const editor = new FableEditor({ target: container, language: 'ar' });
+      editor.setContent(
+        '<table dir="rtl" cellspacing="0" style="border-collapse:collapse"><tbody><tr>' +
+          '<td style="border-color:windowtext;border-style:solid;border-width:1pt;width:93.5pt">أ</td>' +
+          '<td style="border-color:windowtext currentcolor windowtext windowtext;' +
+          'border-style:solid none solid solid;border-width:1pt medium 1pt 1pt;width:93.5pt">ب</td>' +
+          '</tr></tbody></table>'
+      );
+      const html = editor.getContentForEmail();
+      /* Anchored on the closing quote: the borders are the last word on the cell. */
+      expect(html).toContain(';border:1pt solid #000000"');
+      expect(html).toContain(
+        ';border-top:1pt solid #000000;border-right:none;' +
+          'border-bottom:1pt solid #000000;border-left:1pt solid #000000"'
+      );
+      /* The whole point: nothing here depends on border-style surviving. */
+      expect(dropStyleLonghands(html)).toContain('border:1pt solid #000000');
+      editor.destroy();
+    });
+
+    it('keeps the sides Word deliberately left out and drops zero-width borders', () => {
+      const editor = new FableEditor({ target: container, language: 'ar' });
+      editor.setContent(
+        '<table><tbody><tr>' +
+          '<td style="border-color:currentcolor windowtext windowtext;' +
+          'border-style:none solid solid;border-width:medium 1pt 1pt">أ</td>' +
+          '<td style="border-style:solid;border-width:0px;border-color:#333">ب</td>' +
+          '</tr></tbody></table>'
+      );
+      const html = editor.getContentForEmail();
+      expect(html).toContain(
+        ';border-top:none;border-right:1pt solid #000000;border-bottom:1pt solid #000000;border-left:1pt solid #000000"'
+      );
+      expect(html).toContain(';border:none"');
+      editor.destroy();
+    });
+
+    it('repairs a cell whose border-style was already stripped before it came back', () => {
+      const editor = new FableEditor({ target: container, language: 'ar' });
+      editor.setContent('<table><tbody><tr><td style="border-color:windowtext;border-width:1pt">أ</td></tr></tbody></table>');
+      expect(editor.getContentForEmail()).toContain(';border:1pt solid #000000"');
+      editor.destroy();
+    });
+
+    it('leaves cells with no border declarations and editor-made tables alone', () => {
+      const editor = new FableEditor({ target: container, language: 'en' });
+      editor.setContent(
+        '<table style="border-collapse:collapse"><tbody><tr>' +
+          '<td style="padding:4px">a</td>' +
+          '<td style="border:1px solid #b9c2cc">b</td>' +
+          '</tr></tbody></table>'
+      );
+      const html = editor.getContentForEmail();
+      expect(html).toContain('<td style="padding:4px;');
+      expect(html).not.toMatch(/padding:4px[^"]*border/);
+      expect(html).toContain(';border:1px solid #b9c2cc"');
+      editor.destroy();
+    });
+
+    it('pins border-collapse and cellspacing so a stripped border-collapse cannot open gaps', () => {
+      const editor = new FableEditor({ target: container, language: 'en' });
+      editor.setContent('<table><tbody><tr><td style="border:1px solid #000">a</td></tr></tbody></table>');
+      const html = editor.getContentForEmail();
+      expect(html).toContain('cellspacing="0"');
+      expect(html).toContain('border-collapse:collapse');
+      editor.destroy();
+    });
+
+    it('leaves a cell alone when a border value is a css-wide keyword it cannot inline', () => {
+      const editor = new FableEditor({ target: container, language: 'en' });
+      editor.setContent('<table><tbody><tr><td style="border-color:inherit;border-style:solid;border-width:0px">a</td></tr></tbody></table>');
+      expect(editor.getContentForEmail()).toContain(
+        '<td style="border-color:inherit;border-style:solid;border-width:0px;'
+      );
+      editor.destroy();
+    });
+
+    it('does not touch table borders in getContent()', () => {
+      const editor = new FableEditor({ target: container, language: 'en' });
+      const src = '<table><tbody><tr><td style="border-color:windowtext;border-style:solid;border-width:1pt">a</td></tr></tbody></table>';
+      editor.setContent(src);
+      expect(editor.getContent()).toBe(src);
+      editor.destroy();
+    });
+  });
+
   describe('getContentForEmail()', () => {
     it('detects rtl from content when the editor language is en and no dir attribute is present', () => {
       const editor = new FableEditor({ target: container, language: 'en' });

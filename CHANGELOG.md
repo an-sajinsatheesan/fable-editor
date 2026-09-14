@@ -3,6 +3,31 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.1]
+
+### Fixed
+
+- **A pasted Word table lost the border on its first cell once the document was
+  sent as an email.** Word describes a cell's borders as three parallel
+  longhands - `border-color` / `border-style` / `border-width`, one value per
+  side - and a browser re-copy of Word content keeps that split. Mail pipelines
+  allowlist inline CSS one property at a time, and the one in front of this
+  content kept `border-color` and `border-width` while dropping `border-style`;
+  since the initial `border-style` is `none`, a width and a colour on their own
+  drew nothing at all. Only the first cell of each row looked wrong, because
+  Word writes `border-<side>: none` for the edges a cell shares with its
+  neighbour, so every other cell still had a `border-style` list to keep.
+  `getContentForEmail()` now re-emits each side as a single
+  `border-<side>: <width> <style> <colour>` (collapsed to one `border:` when all
+  four agree), so a side survives or disappears as a unit no matter which
+  longhand a sanitizer drops. A side left carrying a width or colour but no
+  style is read back as `solid`, which repairs content that was already
+  flattened before it came back into the editor; `windowtext`, the deprecated
+  system colour Word still emits, becomes plain black; and `border-collapse` is
+  pinned inline with a matching `cellspacing="0"` so a table cannot fall back to
+  spaced-out cells either. Borders are untouched in `getContent()` and the paste
+  engine is unchanged.
+
 ## [1.3.0]
 
 ### Fixed

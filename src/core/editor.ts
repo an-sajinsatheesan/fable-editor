@@ -116,6 +116,147 @@ function firstStrongDir(text: string): 'rtl' | 'ltr' | null {
     return null;
 }
 
+/* ---------------------------------------------------------- email-export table
+   borders — used only by getContentForEmail(). Word describes a cell's borders
+   as three parallel longhands (`border-color` / `border-style` / `border-width`),
+   one value per side, and a browser re-copy of Word content keeps that split.
+   Mail pipelines allowlist CSS one property at a time, and any of them that
+   keeps `border-color` and `border-width` while dropping `border-style` erases
+   the border outright — the initial `border-style` is `none`, so a width and a
+   colour on their own draw nothing. Re-emitting every side as a single
+   `border-<side>: <width> <style> <colour>` (collapsed to one `border:` when all
+   four agree) makes a side survive or vanish as a unit instead. A side left with
+   a width or a colour but no style is read back as `solid`, which also repairs
+   content that was already flattened that way before it came back into the
+   editor, and `windowtext` — a deprecated system colour Word still emits —
+   becomes plain black. */
+const BORDER_SIDES = ['top', 'right', 'bottom', 'left'] as const;
+type BorderSide = (typeof BORDER_SIDES)[number];
+interface SideBorder {
+    width: string | null;
+    style: string | null;
+    color: string | null;
+}
+type BorderPart = 'width' | 'style' | 'color';
+
+const BORDER_STYLE_KEYWORD = /^(none|hidden|dotted|dashed|solid|double|groove|ridge|inset|outset)$/i;
+const BORDER_WIDTH_VALUE = /^(thin|medium|thick|[+-]?(\d+\.?\d*|\.\d+)(px|pt|em|rem|ex|ch|cm|mm|in|pc|q)?)$/i;
+const BORDER_ZERO_WIDTH = /^[+-]?0*(\.0*)?(px|pt|em|rem|ex|ch|cm|mm|in|pc|q)?$/i;
+/* border-* properties that describe something other than one of the four sides,
+   plus the CSS-wide keywords a shorthand cannot express. */
+const BORDER_NOT_A_SIDE = /^border-(collapse|spacing|radius|image|block|inline|start|end)/i;
+const BORDER_SIDE_PROP = /^border(?:-(top|right|bottom|left))?(?:-(width|style|color))?$/;
+const CSS_WIDE_KEYWORD = /^(inherit|initial|unset|revert|revert-layer)$/i;
+
+/* Split on top-level whitespace, so `rgb(0, 0, 0) solid` stays two values. */
+function splitCssValues(value: string): string[] {
+    const out: string[] = [];
+    let depth = 0;
+    let cur = '';
+    for (const ch of value) {
+        if (ch === '(') depth++;
+        else if (ch === ')') depth--;
+        if (depth === 0 && /\s/.test(ch)) {
+            if (cur) out.push(cur);
+            cur = '';
+        } else cur += ch;
+    }
+    if (cur) out.push(cur);
+    return out;
+}
+
+/* 1–4 values in CSS box order → an explicit [top, right, bottom, left]. */
+function boxSides(parts: string[]): string[] {
+    const [t, r = t, b = t, l = r] = parts;
+    return [t, r, b, l];
+}
+
+/* `1pt solid windowtext` in any order; whatever the author left out falls back
+   to its initial value, exactly as the real shorthand resets it. */
+function parseBorderShorthand(value: string): SideBorder {
+    const side: SideBorder = { width: 'medium', style: 'none', color: '' };
+    splitCssValues(value).forEach((part) => {
+        if (BORDER_STYLE_KEYWORD.test(part)) side.style = part.toLowerCase();
+        else if (BORDER_WIDTH_VALUE.test(part)) side.width = part;
+        else side.color = part;
+    });
+    return side;
+}
+
+function emailBorderColor(color: string): string {
+    if (!color || /^currentcolor$/i.test(color)) return '';
+    return /^windowtext$/i.test(color) ? '#000000' : color;
+}
+
+/* One side's declaration value, or '' when that side was never mentioned. */
+function sideBorderValue(side: SideBorder): string {
+    if (side.width === null && side.style === null && side.color === null) return '';
+    const style = side.style ?? 'solid';
+    if (style === 'none' || style === 'hidden') return 'none';
+    if (side.width && BORDER_ZERO_WIDTH.test(side.width)) return 'none';
+    const width = side.width && side.width !== 'medium' ? side.width : '';
+    return [width, style, emailBorderColor(side.color || '')].filter(Boolean).join(' ');
+}
+
+function hardenTableBorders(root: Element): void {
+    root.querySelectorAll<HTMLElement>('table,td,th').forEach((el) => {
+        const raw = el.getAttribute('style') || '';
+        if (!/border/i.test(raw)) return;
+        const sides: Record<BorderSide, SideBorder> = {
+            top: { width: null, style: null, color: null },
+            right: { width: null, style: null, color: null },
+            bottom: { width: null, style: null, color: null },
+            left: { width: null, style: null, color: null }
+        };
+        const rest: string[] = [];
+        let sawBorder = false;
+        let bail = false;
+        raw.split(';').forEach((decl) => {
+            const i = decl.indexOf(':');
+            if (i < 1) {
+                if (decl.trim()) rest.push(decl.trim());
+                return;
+            }
+            const prop = decl.slice(0, i).trim().toLowerCase();
+            const value = decl.slice(i + 1).trim();
+            const m = BORDER_SIDE_PROP.exec(prop);
+            if (!m || BORDER_NOT_A_SIDE.test(prop)) {
+                rest.push(prop + ':' + value);
+                return;
+            }
+            /* `border-color:inherit` and friends only mean anything against a
+               parent this export has no say over — leave the cell untouched. */
+            if (CSS_WIDE_KEYWORD.test(value)) {
+                bail = true;
+                return;
+            }
+            sawBorder = true;
+            const one = m[1] as BorderSide | undefined;
+            const part = m[2] as BorderPart | undefined;
+            if (!part) {
+                /* `border` / `border-<side>` resets all three components. */
+                const parsed = parseBorderShorthand(value);
+                (one ? [one] : BORDER_SIDES.slice()).forEach((s) => {
+                    sides[s] = { ...parsed };
+                });
+            } else if (one) {
+                sides[one][part] = value;
+            } else {
+                const per = boxSides(splitCssValues(value));
+                BORDER_SIDES.forEach((s, n) => {
+                    sides[s][part] = per[n];
+                });
+            }
+        });
+        if (bail || !sawBorder) return;
+        const values = BORDER_SIDES.map((s) => sideBorderValue(sides[s]));
+        const out = rest.slice();
+        if (values.every((v) => v && v === values[0])) out.push('border:' + values[0]);
+        else BORDER_SIDES.forEach((s, n) => values[n] && out.push(`border-${s}:` + values[n]));
+        el.setAttribute('style', out.join(';'));
+    });
+}
+
 /* Text belonging to el itself, skipping subtrees rooted at a descendant that
    already carries its own explicit rtl/ltr dir — that subtree's direction is
    already independently decided and shouldn't sway el's own detection. */
@@ -738,6 +879,18 @@ export class FableEditor implements FableEditorApi {
             if (w > 0 && !/(^|;)\s*width\s*:/i.test(style)) setStyle(img, `width:${w}px`);
             if (!/max-width\s*:/i.test(img.getAttribute('style') || '')) setStyle(img, 'max-width:100%');
             if (!/(^|;)\s*height\s*:/i.test(img.getAttribute('style') || '')) setStyle(img, 'height:auto');
+        });
+
+        /* Borders last, so the per-side shorthands it writes are the final word on
+           every cell. Also pin border-collapse inline and mirror it onto the legacy
+           cellspacing attribute: a mail pipeline that drops border-collapse leaves
+           the table in `separate` mode, where any cellspacing of its own would open
+           gaps between Word's deliberately shared cell edges. */
+        hardenTableBorders(box);
+        box.querySelectorAll('table').forEach((tbl) => {
+            const style = tbl.getAttribute('style') || '';
+            if (!/border-collapse\s*:/i.test(style)) setStyle(tbl, 'border-collapse:collapse');
+            if (!/border-spacing\s*:/i.test(style) && !tbl.hasAttribute('cellspacing')) tbl.setAttribute('cellspacing', '0');
         });
 
         const dir: 'rtl' | 'ltr' = found || (this.ed.getAttribute('dir') as 'rtl' | 'ltr' | null) || this.dir();
