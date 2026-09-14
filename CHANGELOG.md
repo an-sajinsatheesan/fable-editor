@@ -3,6 +3,50 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.4.0]
+
+### Added
+
+- **The standalone editor can resize an image by its corners.**
+  `fable-editor.js` mirrored the library's image sizing but had none of its
+  resize handles, so a picture there could only ever be the size it came in at.
+  Hovering an image now puts a grip on each of its four corners; dragging one
+  sets the image's width, and the height stays `auto`, so the aspect ratio is
+  never lost. The drag writes the `width` attribute alongside the inline width
+  for the same reason the library does - Outlook desktop follows the attribute
+  rather than the CSS. Images in a template media slot stay fluid and are not
+  pinned to a width.
+
+### Fixed
+
+- **A picture dragged wider than the text column went out in a mail at a size
+  nobody had seen.** `.earea img { max-width:100% }` clamps an image to the
+  editor's text column, but the resize drag stored whatever width the pointer
+  reached: drag the image in a 700px column out to 1200px and the editor kept
+  showing 700px while `width="1200"` sat in the markup - and 1200px is what the
+  mail client used. The drag is now capped at the content column, and the final
+  size is read back off the laid-out box (`offsetWidth`, so a rotate or flip
+  cannot distort it) instead of off the style string, so the attribute, the
+  inline width and what is on screen can no longer disagree.
+
+- **`getContentForEmail()` trusted a width in the markup over the one on
+  screen.** It measured the live image only when the markup carried no `width`
+  at all, so a stale or oversized width - one left by the drag above, one being
+  clamped by `max-width:100%`, or one stored by an older version - won over the
+  size the user was looking at. The measured width is now the last word: it
+  replaces any `width:` the image already carries rather than appending a second
+  declaration for the client to choose between, and the `height` attribute that
+  was paired with the old width is dropped, so the aspect ratio comes from the
+  picture itself exactly as the editor's `height:auto` renders it. Template
+  media slots are still skipped.
+
+- **Preview showed a full-width image 28px narrower than it would be sent.**
+  The preview box is sized to the editor's content column, but its own 14px
+  padding came out of that width on any host page carrying the usual global
+  `* { box-sizing: border-box }` reset. The box now pins
+  `box-sizing:content-box`, so the column it previews at is the column the
+  editor measured.
+
 ## [1.3.2]
 
 ### Fixed

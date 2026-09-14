@@ -839,6 +839,17 @@ export class FableEditor implements FableEditorApi {
             const cur = (el.getAttribute('style') || '').trim();
             el.setAttribute('style', cur ? cur.replace(/;?$/, '; ') + decl : decl);
         };
+        /* Replaces the `width:` an element already carries instead of appending a
+           second one and leaving it to the mail client which of the two wins.
+           `max-width` / `min-width` are left alone. */
+        const setWidthPx = (el: Element, w: number): void => {
+            const kept = (el.getAttribute('style') || '')
+                .split(';')
+                .map((d) => d.trim())
+                .filter((d) => d && !/^width\s*:/i.test(d));
+            kept.push(`width:${w}px`);
+            el.setAttribute('style', kept.join('; '));
+        };
         const box = document.createElement('div');
         box.innerHTML = this.ed.innerHTML;
         let found: 'rtl' | 'ltr' | null = null;
@@ -868,15 +879,25 @@ export class FableEditor implements FableEditorApi {
            built from the same HTML) and make it explicit. The width attribute is what
            Outlook desktop follows; max-width keeps it inside narrow mobile clients.
            Documents saved before this existed are fixed here too, without rewriting
-           anything the host has stored. */
+           anything the host has stored.
+           The measured width overrides what the markup carries rather than only
+           filling a gap: an image that `max-width:100%` is clamping, and one whose
+           stored size predates a resize, are on screen at the measured width and have
+           to leave at it too — that is what makes the mail match the preview.
+           offsetWidth is the laid-out width, so a rotate/flip transform on the image
+           cannot distort it, and a stale height attribute goes out with the old width:
+           the aspect ratio then comes from the picture itself, exactly as the editor's
+           `height:auto` gives it. */
         const liveImgs = this.ed.querySelectorAll('img');
         box.querySelectorAll('img').forEach((img, i) => {
             if (img.closest('.tpl-media')) return;
             const live = liveImgs[i] as HTMLImageElement | undefined;
-            const w = Math.round(live?.getBoundingClientRect().width || 0);
-            if (w > 0 && !img.getAttribute('width')) img.setAttribute('width', String(w));
-            const style = img.getAttribute('style') || '';
-            if (w > 0 && !/(^|;)\s*width\s*:/i.test(style)) setStyle(img, `width:${w}px`);
+            const w = Math.round(live?.offsetWidth || 0);
+            if (w > 0) {
+                img.setAttribute('width', String(w));
+                img.removeAttribute('height');
+                setWidthPx(img, w);
+            }
             if (!/max-width\s*:/i.test(img.getAttribute('style') || '')) setStyle(img, 'max-width:100%');
             if (!/(^|;)\s*height\s*:/i.test(img.getAttribute('style') || '')) setStyle(img, 'height:auto');
         });
@@ -2765,14 +2786,18 @@ export class FableEditor implements FableEditorApi {
                image is exactly the size the user left it at — a narrower preview pane
                would silently shrink it and misreport what will be sent. The dialog gets
                a wider cap to make that width reachable; on a viewport too small for it
-               the image's max-width:100% scales things down rather than clipping. */
+               the image's max-width:100% scales things down rather than clipping.
+               box-sizing is pinned because a host page with the usual global
+               border-box rule would otherwise take the 14px padding out of that width
+               and preview every full-width image 28px narrower than it will be sent. */
             body.closest('.dlg')?.classList.add('dlg-preview');
             const box = document.createElement('div');
             box.className = 'pv-box';
             const w = this.contentWidth();
             box.style.cssText =
                 `width:${w > 0 ? Math.round(w) : 640}px;max-width:100%;max-height:52vh;overflow:auto;` +
-                'border:1px solid #e3e3e3;border-radius:6px;padding:14px;font-family:Helvetica,Arial,sans-serif;font-size:14px';
+                'box-sizing:content-box;border:1px solid #e3e3e3;border-radius:6px;padding:14px;' +
+                'font-family:Helvetica,Arial,sans-serif;font-size:14px';
             box.innerHTML = this.ed.innerHTML;
             body.appendChild(box);
         });
@@ -4457,11 +4482,18 @@ export class FableEditor implements FableEditorApi {
         if (!img) return;
         this.cancelImgHide();
         const startX = e.clientX;
-        const startW = img.getBoundingClientRect().width;
+        const startW = img.offsetWidth || img.getBoundingClientRect().width;
         const sign = corner === 'nw' || corner === 'sw' ? -1 : 1;
+        /* `.earea img { max-width:100% }` clamps an image to the text column, so a drag
+           past that edge would store a width the editor never renders — and a mail, which
+           carries no such rule, would then go out at that unseen width. Cap the drag at
+           the column so the stored size is always the size on screen. */
+        const max = Math.round(this.contentWidth());
         this.withNoTextSelect((restore) => {
             const mv = (ev: MouseEvent) => {
-                img.style.width = Math.max(24, Math.round(startW + sign * (ev.clientX - startX))) + 'px';
+                let w = Math.max(24, Math.round(startW + sign * (ev.clientX - startX)));
+                if (max > 0) w = Math.min(w, max);
+                img.style.width = w + 'px';
                 img.style.height = 'auto';
                 this.positionImageHandles();
             };
@@ -4471,9 +4503,12 @@ export class FableEditor implements FableEditorApi {
                 restore();
                 /* mirror the final size onto the width attribute: Outlook desktop
                    follows the attribute rather than the CSS, so without this a resized
-                   image still goes out at its original size */
-                const w = parseInt(img.style.width, 10);
+                   image still goes out at its original size. Read it back from the laid
+                   out box — offsetWidth ignores any rotate/flip transform — so the
+                   attribute, the inline width and what the user sees cannot disagree. */
+                const w = Math.round(img.offsetWidth) || parseInt(img.style.width, 10);
                 if (w > 0 && !img.closest('.tpl-media')) {
+                    img.style.width = w + 'px';
                     img.setAttribute('width', String(w));
                     img.removeAttribute('height');
                 }

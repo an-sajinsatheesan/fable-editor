@@ -1072,13 +1072,17 @@ function previewDlg(){
        is exactly the size the user left it at - a narrower preview pane would silently
        shrink it and misreport what will be sent. The dialog gets a wider cap to make
        that width reachable; on a viewport too small for it the image's max-width:100%
-       scales things down rather than clipping. */
+       scales things down rather than clipping. box-sizing is pinned because a host
+       page with the usual global border-box rule would otherwise take the 14px padding
+       out of that width and preview every full-width image 28px narrower than it will
+       be sent. */
     const dlgEl=body.closest('.dlg'); if(dlgEl) dlgEl.classList.add('dlg-preview');
     const box=document.createElement('div');
     box.className='pv-box';
     const w=contentWidth();
     box.style.cssText=`width:${w>0?Math.round(w):640}px;max-width:100%;max-height:52vh;overflow:auto;`+
-      'border:1px solid #e3e3e3;border-radius:6px;padding:14px;font-family:Helvetica,Arial,sans-serif;font-size:14px';
+      'box-sizing:content-box;border:1px solid #e3e3e3;border-radius:6px;padding:14px;'+
+      'font-family:Helvetica,Arial,sans-serif;font-size:14px';
     box.innerHTML = ed.innerHTML; body.appendChild(box);
   });
 }
@@ -1350,6 +1354,112 @@ ed.addEventListener('drop', e=>{
   const file=[...(e.dataTransfer?.files||[])].find(f=>f.type.startsWith('image/'));
   if(file) readImageFileInto(file, ph);
 });
+
+/* ---------------------------------------------------------- image resize
+   Four corner grips on the image under the pointer, dragged to set its width.
+   The height follows from height:auto so the aspect ratio is never lost, and the
+   drag is capped at the text column: `.earea img{max-width:100%}` would clamp
+   anything wider, and a stored width the editor never renders is exactly how a
+   picture ends up leaving in a mail at a size the user never saw. */
+const IMG_CORNERS=['nw','ne','sw','se'];
+let imgActive=null, imgHandles=[], imgHideTimer=null;
+function cancelImgHide(){
+  if(imgHideTimer!=null){ clearTimeout(imgHideTimer); imgHideTimer=null; }
+}
+function scheduleImgHide(){
+  cancelImgHide();
+  imgHideTimer=setTimeout(clearImageHandles, 250);
+}
+function clearImageHandles(){
+  cancelImgHide();
+  imgHandles.forEach(h=>h.remove());
+  imgHandles=[];
+  imgActive?.classList.remove('img-selected');
+  imgActive=null;
+}
+function selectImage(img){
+  if(imgActive===img) return;
+  clearImageHandles();
+  imgActive=img;
+  img.classList.add('img-selected');
+  imgHandles=IMG_CORNERS.map(corner=>{
+    const h=document.createElement('div');
+    h.className='img-handle img-handle-'+corner;
+    h.dataset.corner=corner;
+    h.addEventListener('mousedown', e=>startImageResizeDrag(e,corner));
+    h.addEventListener('mouseenter', cancelImgHide);
+    h.addEventListener('mouseleave', scheduleImgHide);
+    document.body.appendChild(h);
+    return h;
+  });
+  positionImageHandles();
+}
+function positionImageHandles(){
+  if(!imgActive || !document.body.contains(imgActive)){ clearImageHandles(); return; }
+  const r=imgActive.getBoundingClientRect();
+  const top=r.top+scrollY, left=r.left+scrollX, right=r.right+scrollX, bottom=r.bottom+scrollY;
+  const at={nw:[left,top], ne:[right,top], sw:[left,bottom], se:[right,bottom]};
+  imgHandles.forEach(h=>{
+    const [x,y]=at[h.dataset.corner];
+    h.style.left=(x-5)+'px';
+    h.style.top=(y-5)+'px';
+  });
+}
+function startImageResizeDrag(e, corner){
+  e.preventDefault();
+  const img=imgActive; if(!img) return;
+  cancelImgHide();
+  const startX=e.clientX;
+  const startW=img.offsetWidth || img.getBoundingClientRect().width;
+  const sign=(corner==='nw'||corner==='sw') ? -1 : 1;
+  const max=Math.round(contentWidth());
+  withNoTextSelect(restore=>{
+    const mv=ev=>{
+      let w=Math.max(24, Math.round(startW + sign*(ev.clientX-startX)));
+      if(max>0) w=Math.min(w,max);
+      img.style.width=w+'px';
+      img.style.height='auto';
+      positionImageHandles();
+    };
+    const up=()=>{
+      removeEventListener('mousemove',mv); removeEventListener('mouseup',up);
+      restore();
+      /* mirror the final size onto the width attribute: Outlook desktop follows the
+         attribute rather than the CSS, so without this a resized image still goes out
+         at its original size. Read it back off the laid-out box (offsetWidth ignores
+         any transform) so the attribute, the inline width and what the user sees
+         cannot disagree. */
+      const w=Math.round(img.offsetWidth) || parseInt(img.style.width,10);
+      if(w>0 && !img.closest('.tpl-media')){
+        img.style.width=w+'px';
+        img.setAttribute('width', String(w));
+        img.removeAttribute('height');
+      }
+      onChange();
+    };
+    addEventListener('mousemove',mv); addEventListener('mouseup',up);
+  });
+}
+ed.addEventListener('mousedown', e=>{
+  const img = e.target.closest && e.target.closest('img');
+  if(img && ed.contains(img)){ e.preventDefault(); selectImage(img); }
+  else clearImageHandles();
+});
+ed.addEventListener('mouseover', e=>{
+  const img = e.target.closest && e.target.closest('img');
+  if(img && ed.contains(img)){ cancelImgHide(); selectImage(img); }
+});
+ed.addEventListener('mouseout', e=>{
+  const img = e.target.closest && e.target.closest('img');
+  if(!img) return;
+  const to=e.relatedTarget;
+  if(to && (imgHandles.some(h=>h.contains(to)) || (to.closest && to.closest('img')===img))) return;
+  scheduleImgHide();
+});
+ed.addEventListener('scroll', positionImageHandles);
+window.addEventListener('scroll', positionImageHandles, true);
+window.addEventListener('resize', positionImageHandles);
+ed.addEventListener('input', positionImageHandles);
 
 /* ---------------------------------------------- video upload placeholder */
 function pickVideo(){ vidInput.value=''; vidInput.click(); }
@@ -2331,7 +2441,7 @@ function onChange(){
   /* console.log(getContent()); */
 }
 window.getContent = ()=>ed.innerHTML;
-window.setContent = h=>{ ed.innerHTML=h||'<p><br></p>'; refreshState(); clearTableHandles(); stampExistingImages(); };
+window.setContent = h=>{ ed.innerHTML=h||'<p><br></p>'; refreshState(); clearTableHandles(); clearImageHandles(); stampExistingImages(); };
 
 /* email-export direction detection - used only by getContentForEmail(). Content
    pasted from Word/Outlook usually carries explicit dir="rtl"/"ltr" per
@@ -2510,6 +2620,14 @@ window.getContentForEmail = function(){
     const cur=(el.getAttribute('style')||'').trim();
     el.setAttribute('style', cur ? cur.replace(/;?$/,'; ')+decl : decl);
   };
+  /* replaces the `width:` an element already carries instead of appending a second one
+     and leaving it to the mail client which of the two wins; max-/min-width stay */
+  const setWidthPx=(el,w)=>{
+    const kept=(el.getAttribute('style')||'').split(';').map(d=>d.trim())
+      .filter(d=>d && !/^width\s*:/i.test(d));
+    kept.push(`width:${w}px`);
+    el.setAttribute('style', kept.join('; '));
+  };
   const box=document.createElement('div');
   box.innerHTML=ed.innerHTML;
   let found=null;
@@ -2537,14 +2655,24 @@ window.getContentForEmail = function(){
      has on screen from the live editor (index-matched - the clone was built from the
      same HTML) and make it explicit. The width attribute is what Outlook desktop
      follows; max-width keeps it inside narrow mobile clients. Documents saved before
-     this existed are fixed here too, without rewriting anything already stored. */
+     this existed are fixed here too, without rewriting anything already stored.
+     The measured width overrides what the markup carries rather than only filling a
+     gap: an image that max-width:100% is clamping, and one whose stored size predates
+     a resize, are on screen at the measured width and have to leave at it too - that
+     is what makes the mail match the preview. offsetWidth is the laid-out width, so a
+     rotate/flip transform on the image cannot distort it, and a stale height attribute
+     goes out with the old width: the aspect ratio then comes from the picture itself,
+     exactly as the editor's height:auto gives it. */
   const liveImgs = ed.querySelectorAll('img');
   box.querySelectorAll('img').forEach((img,i)=>{
     if(img.closest('.tpl-media')) return;
     const live=liveImgs[i];
-    const w=Math.round((live&&live.getBoundingClientRect().width)||0);
-    if(w>0 && !img.getAttribute('width')) img.setAttribute('width', String(w));
-    if(w>0 && !/(^|;)\s*width\s*:/i.test(img.getAttribute('style')||'')) setStyle(img, `width:${w}px`);
+    const w=Math.round((live&&live.offsetWidth)||0);
+    if(w>0){
+      img.setAttribute('width', String(w));
+      img.removeAttribute('height');
+      setWidthPx(img, w);
+    }
     if(!/max-width\s*:/i.test(img.getAttribute('style')||'')) setStyle(img,'max-width:100%');
     if(!/(^|;)\s*height\s*:/i.test(img.getAttribute('style')||'')) setStyle(img,'height:auto');
   });

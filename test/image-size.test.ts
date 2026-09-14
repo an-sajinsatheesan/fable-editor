@@ -246,9 +246,171 @@ describe('preview matches the editor', () => {
     expect(box.style.maxWidth).toBe('100%');
   });
 
+  /* a host page's global `* { box-sizing: border-box }` would otherwise eat the box's
+     own padding out of the column width and preview a full-width image 28px narrow */
+  it('measures its width without its padding, whatever the host page resets', () => {
+    const box = openPreview().querySelector('.pv-box') as HTMLElement;
+    expect(box.style.boxSizing).toBe('content-box');
+  });
+
   it('shows the editor content', () => {
     editor.setContent('<p>preview me</p>');
     const box = openPreview().querySelector('.pv-box') as HTMLElement;
     expect(box.innerHTML).toContain('preview me');
+  });
+});
+
+describe('resizing an image by a corner handle', () => {
+  let container: HTMLDivElement;
+  let editor: FableEditor;
+  let changes: string[];
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    changes = [];
+    editor = new FableEditor({ target: container, onChange: (html) => changes.push(html) });
+    (editor as any).contentWidth = () => 700;
+  });
+
+  afterEach(() => {
+    editor.destroy();
+    container.remove();
+  });
+
+  /** jsdom lays nothing out, so stand in for the box the browser would give the
+   *  image: its inline width, clamped the way `.earea img { max-width:100% }` clamps
+   *  it to the text column. That clamp is the whole point of the drag cap. */
+  const layOut = (img: HTMLImageElement, startWidth: number) => {
+    img.style.width = startWidth + 'px';
+    Object.defineProperty(img, 'offsetWidth', {
+      configurable: true,
+      get: () => Math.min(parseInt(img.style.width, 10) || 0, 700)
+    });
+  };
+
+  const imageAt = (startWidth: number) => {
+    editor.setContent('<p><img src="https://example.com/a.png"></p>');
+    const img = container.querySelector('.earea img') as HTMLImageElement;
+    layOut(img, startWidth);
+    return img;
+  };
+
+  /** Grabs the named corner grip and drags it dx pixels horizontally. */
+  const dragCorner = (img: HTMLImageElement, corner: string, dx: number) => {
+    (editor as any).selectImage(img);
+    const grip = document.body.querySelector('.img-handle-' + corner) as HTMLElement;
+    grip.dispatchEvent(new MouseEvent('mousedown', { clientX: 0, bubbles: true }));
+    window.dispatchEvent(new MouseEvent('mousemove', { clientX: dx }));
+    window.dispatchEvent(new MouseEvent('mouseup'));
+  };
+
+  it('puts a grip on all four corners of the selected image', () => {
+    const img = imageAt(400);
+    (editor as any).selectImage(img);
+    expect(img.classList.contains('img-selected')).toBe(true);
+    ['nw', 'ne', 'sw', 'se'].forEach((corner) => {
+      expect(document.body.querySelector('.img-handle-' + corner)).not.toBeNull();
+    });
+  });
+
+  it('widens the image when a trailing corner is dragged outwards', () => {
+    const img = imageAt(400);
+    dragCorner(img, 'se', 200);
+    expect(img.style.width).toBe('600px');
+    expect(img.getAttribute('width')).toBe('600');
+  });
+
+  it('narrows the image when a trailing corner is dragged inwards', () => {
+    const img = imageAt(400);
+    dragCorner(img, 'se', -200);
+    expect(img.style.width).toBe('200px');
+    expect(img.getAttribute('width')).toBe('200');
+  });
+
+  it('reads a leading corner in the opposite direction', () => {
+    const img = imageAt(400);
+    dragCorner(img, 'nw', -200);
+    expect(img.style.width).toBe('600px');
+  });
+
+  it('stops at the text column, so the stored width is one the editor renders', () => {
+    const img = imageAt(400);
+    dragCorner(img, 'se', 500); /* 900px of drag against a 700px column */
+    expect(img.style.width).toBe('700px');
+    expect(img.getAttribute('width')).toBe('700');
+  });
+
+  it('keeps the aspect ratio free and drops a height the source carried', () => {
+    editor.setContent('<p><img width="400" height="250" src="https://example.com/a.png"></p>');
+    const img = container.querySelector('.earea img') as HTMLImageElement;
+    layOut(img, 400);
+    dragCorner(img, 'se', 100);
+    expect(img.style.height).toBe('auto');
+    expect(img.hasAttribute('height')).toBe(false);
+  });
+
+  it('reports the resize as a change', () => {
+    const img = imageAt(400);
+    changes.length = 0;
+    dragCorner(img, 'se', 100);
+    expect(changes).toHaveLength(1);
+  });
+
+  it('leaves a template media slot fluid instead of pinning a width attribute', () => {
+    editor.setContent('<div class="tpl-media"><img src="https://example.com/a.png"></div>');
+    const img = container.querySelector('.earea .tpl-media img') as HTMLImageElement;
+    layOut(img, 400);
+    dragCorner(img, 'se', 100);
+    expect(img.getAttribute('width')).toBeNull();
+  });
+});
+
+describe('the size that leaves in a mail is the size on screen', () => {
+  let container: HTMLDivElement;
+  let editor: FableEditor;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    editor = new FableEditor({ target: container });
+  });
+
+  afterEach(() => {
+    editor.destroy();
+    container.remove();
+  });
+
+  const laidOutAt = (html: string, width: number) => {
+    editor.setContent(html);
+    const img = container.querySelector('.earea img') as HTMLImageElement;
+    Object.defineProperty(img, 'offsetWidth', { value: width, configurable: true });
+    return img;
+  };
+
+  it('replaces a width the markup carries with the width the editor renders', () => {
+    laidOutAt('<p><img width="1600" style="width:1600px" src="https://example.com/a.png"></p>', 700);
+    const out = editor.getContentForEmail();
+    expect(out).toContain('width="700"');
+    expect(out).toContain('width:700px');
+    expect(out).not.toContain('1600');
+  });
+
+  it('does not leave two width declarations for the client to choose between', () => {
+    laidOutAt('<p><img style="width:1600px" src="https://example.com/a.png"></p>', 700);
+    const out = editor.getContentForEmail();
+    expect(out.match(/[^-]width:/g)).toHaveLength(1);
+  });
+
+  it('drops a height that belonged to the old width', () => {
+    laidOutAt('<p><img width="1600" height="900" src="https://example.com/a.png"></p>', 700);
+    const out = editor.getContentForEmail();
+    expect(out).not.toContain('height="900"');
+    expect(out).toContain('height:auto');
+  });
+
+  it('keeps max-width so a narrow phone client still scales the image down', () => {
+    laidOutAt('<p><img src="https://example.com/a.png"></p>', 700);
+    expect(editor.getContentForEmail()).toContain('max-width:100%');
   });
 });
