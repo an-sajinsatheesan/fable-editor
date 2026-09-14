@@ -388,6 +388,20 @@
                height: auto;
           }
 
+          /* the preview dialog mounts on document.body, outside .earea, so it needs
+             the same clamping or an image previews at its raw pixel size */
+          .dlg .pv-box img, .dlg .pv-box video {
+               max-width: 100%;
+               height: auto;
+          }
+
+          /* preview is sized to the editor's own content column so what it shows is
+             the size that will actually be sent; that needs more room than the
+             standard dialog cap allows */
+          .dlg.dlg-preview {
+               max-width: 96vw;
+          }
+
           /* image / video upload placeholder */
           .earea .img-ph, .earea .vid-ph {
                display: flex;

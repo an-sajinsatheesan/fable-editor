@@ -63,3 +63,31 @@ describe('cleanPastedHTML — Word table alignment', () => {
     expect(styleOf(out, 'p')).toContain('text-align:center');
   });
 });
+
+/* Word images are recovered before the engine runs (see word-image-paste.ts); the
+   engine's own src policy is unchanged and these lock that down. */
+describe('cleanPastedHTML — image src policy is unchanged', () => {
+  it('replaces a file:// image with the placeholder', () => {
+    const out = cleanPastedHTML(wordWrap(`<p><img src="file:///C:/Temp/clip_image001.png"></p>`), 'ltr');
+    expect(out).toContain('[local image — paste it separately]');
+    expect(out).not.toContain('<img');
+  });
+
+  it('replaces a cid: image with the placeholder', () => {
+    const out = cleanPastedHTML(`<p><img src="cid:image001.png@01D9A2"></p>`, 'ltr');
+    expect(out).toContain('[local image — paste it separately]');
+  });
+
+  it('keeps https, data: and blob: images', () => {
+    ['https://example.com/a.png', 'data:image/png;base64,iVBORw0KGgo=', 'blob:http://x/y'].forEach((src) => {
+      const out = cleanPastedHTML(`<p><img src="${src}"></p>`, 'ltr');
+      expect(out).toContain(`src="${src}"`);
+    });
+  });
+
+  it('preserves the width and height Word puts on an image', () => {
+    const out = cleanPastedHTML(`<p><img width=417 height=125 src="https://example.com/a.png"></p>`, 'ltr');
+    expect(out).toContain('width="417"');
+    expect(out).toContain('height="125"');
+  });
+});

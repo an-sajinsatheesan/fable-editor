@@ -3,6 +3,49 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.0]
+
+### Fixed
+
+- **Images were lost when pasting from a Word document opened off the local
+  disk.** Desktop Word writes `<img src="file:///…/msohtmlclip1/01/
+  clip_image001.png">` into the HTML clipboard flavor - a local temp file the
+  browser cannot read - so the paste engine replaced it with the "[local image
+  - paste it separately]" placeholder. The same paste also carries a `text/rtf`
+  flavor with every picture embedded as hex in a `{\pict}` group; those are now
+  decoded and paired with the images in the HTML before the paste engine runs,
+  which is how TinyMCE PowerPaste implements `powerpaste_allow_local_images`.
+  Pictures become inline base64 by default, or go through `imageUploadHandler`
+  when one is configured. Pastes from webmail are unaffected, and anything that
+  still cannot be recovered (a true vector metafile) keeps the placeholder.
+  The paste engine itself is unchanged.
+
+- **An image came out at a different size in Preview and in a sent email than
+  it had in the editor.** Inserted images carried no dimensions at all - they
+  only looked right inside the editor because of its `.earea img
+  { max-width:100% }` rule, which does not exist in the preview dialog (it
+  mounts outside the editor) or in a mail client. Inserted images now get an
+  explicit width, and `getContentForEmail()` makes the on-screen size explicit
+  on every image. Resizing an image by its corner handle now also writes the
+  `width` attribute, which is what Outlook desktop follows. Images in template
+  media slots stay fluid as before.
+
+- **Documents saved before the editor recorded image sizes are corrected when
+  they load.** Content arriving through `setContent()` or `initialContent` has
+  any size-less image measured and stamped once it decodes, so an existing
+  document renders the same in the editor, in Preview and in a sent mail without
+  the host having to migrate stored HTML. Images that already carry a size, and
+  template slots, are left untouched; a single change event is emitted once the
+  images settle, and none at all when nothing needed stamping.
+
+### Changed
+
+- **Preview now renders at the editor's own content width** instead of a fixed
+  640px box, so an image is the same size in Preview as in the editor and in
+  the sent mail rather than being silently scaled down. The preview dialog is
+  allowed to grow wider than a standard dialog to make that width reachable; on
+  a viewport too small for it, content scales down instead of being clipped.
+
 ## [1.2.8]
 
 ### Fixed

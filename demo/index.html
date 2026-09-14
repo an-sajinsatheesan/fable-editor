@@ -57,6 +57,7 @@
     <div id="editor"></div>
     <div class="demo-bar" style="margin-top:14px">
       <button id="getContent">Log content to console</button>
+      <button id="getEmail">Log email HTML</button>
       <button id="setContent">Set sample content</button>
       <button id="toggleUpload" style="margin-inline-start:auto">Image upload: Base64 (inline)</button>
     </div>
@@ -90,6 +91,9 @@
         onImageUploadError: (err) => console.error('image upload failed:', err),
         onChange: (html) => console.log('changed:', html.length)
       });
+      /* handy from the devtools console: fableDemoEditor.setContent('…'),
+         .getContentForEmail(), etc. */
+      window.fableDemoEditor = editor;
     }
 
     createEditor();
@@ -108,6 +112,13 @@
 
     document.getElementById('getContent').addEventListener('click', () => {
       console.log(editor.getContent());
+    });
+
+    /* getContentForEmail() is what an email pipeline should send: same HTML, plus the
+       direction wrapper and explicit image sizes. Handy for comparing against the
+       plain getContent() output above. */
+    document.getElementById('getEmail').addEventListener('click', () => {
+      console.log(editor.getContentForEmail());
     });
 
     document.getElementById('setContent').addEventListener('click', () => {

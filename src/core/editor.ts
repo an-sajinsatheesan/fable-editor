@@ -3,6 +3,7 @@ import { getStrings, I18nStrings } from './i18n';
 import { FONTS, SIZES, BLOCKS, COLORS, QUICK_COLORS, CHAR_CATEGORIES, EMOJI_CATEGORIES, GlyphCategory, MIN_FONT_PX, MAX_FONT_PX, LINE_HEIGHTS, WORD_SPACINGS, LETTER_SPACINGS, CODE_LANGS, DEFAULT_TOOLBAR, DEFAULT_MENUBAR } from './config';
 import { IC } from './icons';
 import { cleanPastedHTML, normalizeTextPaste } from './paste-engine';
+import { countUnresolvedImages, dataUrlToFile, injectImages, injectRtfImages } from './word-image-paste';
 import { importDocxToHtml } from './docx-import';
 
 type ImgCorner = 'nw' | 'ne' | 'sw' | 'se';
@@ -257,6 +258,7 @@ export class FableEditor implements FableEditorApi {
         this.bindEvents();
         this.initUI();
         this.recordRevision();
+        this.stampExistingImages();
         this.options.onReady(this);
     }
 
@@ -587,11 +589,7 @@ export class FableEditor implements FableEditorApi {
             const fr = new FileReader();
             fr.onload = () => {
                 this.restoreSel();
-                document.execCommand(
-                    'insertHTML',
-                    false,
-                    `<img src="${fr.result}" title="${file.name.replace(/"/g, '')}" alt="">`
-                );
+                this.insertImageHTML(fr.result as string, file.name.replace(/"/g, ''));
                 this.onChange();
             };
             fr.readAsDataURL(file);
@@ -723,6 +721,25 @@ export class FableEditor implements FableEditorApi {
             setStyle(el, hasAlign ? `direction:${d}` : `direction:${d};text-align:${d === 'rtl' ? 'right' : 'left'}`);
         });
 
+        /* Images: an email has none of the editor's CSS, so an image with no explicit
+           size renders at its raw pixel size in the mail client. Take the size it
+           actually has on screen from the live editor (index-matched — the clone was
+           built from the same HTML) and make it explicit. The width attribute is what
+           Outlook desktop follows; max-width keeps it inside narrow mobile clients.
+           Documents saved before this existed are fixed here too, without rewriting
+           anything the host has stored. */
+        const liveImgs = this.ed.querySelectorAll('img');
+        box.querySelectorAll('img').forEach((img, i) => {
+            if (img.closest('.tpl-media')) return;
+            const live = liveImgs[i] as HTMLImageElement | undefined;
+            const w = Math.round(live?.getBoundingClientRect().width || 0);
+            if (w > 0 && !img.getAttribute('width')) img.setAttribute('width', String(w));
+            const style = img.getAttribute('style') || '';
+            if (w > 0 && !/(^|;)\s*width\s*:/i.test(style)) setStyle(img, `width:${w}px`);
+            if (!/max-width\s*:/i.test(img.getAttribute('style') || '')) setStyle(img, 'max-width:100%');
+            if (!/(^|;)\s*height\s*:/i.test(img.getAttribute('style') || '')) setStyle(img, 'height:auto');
+        });
+
         const dir: 'rtl' | 'ltr' = found || (this.ed.getAttribute('dir') as 'rtl' | 'ltr' | null) || this.dir();
         box.querySelectorAll('table:not([dir])').forEach((tbl) => {
             tbl.setAttribute('dir', dir);
@@ -744,6 +761,7 @@ export class FableEditor implements FableEditorApi {
         this.clearCodeSel();
         this.clearSelToolbar();
         this.onChange();
+        this.stampExistingImages();
     }
 
     insertContent(html: string): void {
@@ -2590,9 +2608,18 @@ export class FableEditor implements FableEditorApi {
 
     private previewDlg(): void {
         this.dialog(this.t('previewttl'), (body) => {
+            /* The preview renders the document at the editor's own column width, so an
+               image is exactly the size the user left it at — a narrower preview pane
+               would silently shrink it and misreport what will be sent. The dialog gets
+               a wider cap to make that width reachable; on a viewport too small for it
+               the image's max-width:100% scales things down rather than clipping. */
+            body.closest('.dlg')?.classList.add('dlg-preview');
             const box = document.createElement('div');
+            box.className = 'pv-box';
+            const w = this.contentWidth();
             box.style.cssText =
-                'width:640px;max-width:78vw;max-height:52vh;overflow:auto;border:1px solid #e3e3e3;border-radius:6px;padding:14px;font-family:Helvetica,Arial,sans-serif;font-size:14px';
+                `width:${w > 0 ? Math.round(w) : 640}px;max-width:100%;max-height:52vh;overflow:auto;` +
+                'border:1px solid #e3e3e3;border-radius:6px;padding:14px;font-family:Helvetica,Arial,sans-serif;font-size:14px';
             box.innerHTML = this.ed.innerHTML;
             body.appendChild(box);
         });
@@ -2838,9 +2865,85 @@ export class FableEditor implements FableEditorApi {
         img.alt = '';
         if (title) img.title = title;
         ph.replaceWith(img);
+        this.stampImageSize(img);
         if (this.phActive === ph) this.clearImgPlaceholderSel();
         this.refreshState();
         this.onChange();
+    }
+
+    /** Width of the editor's text column — the width `.earea img { max-width:100% }`
+     *  clamps an oversized image to. */
+    private contentWidth(): number {
+        const cs = getComputedStyle(this.ed);
+        const pad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+        return Math.max(0, this.ed.clientWidth - pad);
+    }
+
+    /** Inserts an <img> through execCommand and stamps its size once it has decoded.
+     *  A throwaway id is the only way to get a handle on what insertHTML created. */
+    private insertImageHTML(src: string, title?: string): void {
+        const id = 'fable-img-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        document.execCommand(
+            'insertHTML',
+            false,
+            `<img id="${id}" src="${src}"${title ? ` title="${title}"` : ''} alt="">`
+        );
+        const img = this.ed.querySelector('#' + id) as HTMLImageElement | null;
+        if (!img) return;
+        img.removeAttribute('id');
+        this.stampImageSize(img);
+    }
+
+    /** Gives a newly inserted image an explicit size so it renders the same in the
+     *  editor, in Preview and in a sent email. Without it the image only looks right
+     *  inside `.earea`, whose `max-width:100%` rule exists nowhere else — which is why
+     *  the same picture came out at a different size once the mail was sent.
+     *  Leaves alone: images inside a template media slot (deliberately fluid) and any
+     *  image that already carries a size from its source. */
+    private stampImageSize(img: HTMLImageElement, onSettled?: (stamped: boolean) => void): void {
+        const finish = (stamped: boolean) => {
+            if (onSettled) onSettled(stamped);
+            else if (stamped) this.onChange();
+        };
+        const apply = () => {
+            if (!this.ed.contains(img)) return finish(false);
+            if (img.closest('.tpl-media')) return finish(false);
+            if (img.getAttribute('width') || img.getAttribute('height')) return finish(false);
+            if (img.style.width || img.style.height) return finish(false);
+            const natural = img.naturalWidth;
+            if (!natural) return finish(false); /* not decoded (or jsdom) — nothing reliable to stamp */
+            const max = this.contentWidth();
+            const w = Math.round(max > 0 ? Math.min(natural, max) : natural);
+            img.setAttribute('width', String(w));
+            img.style.width = w + 'px';
+            img.style.height = 'auto';
+            finish(true);
+        };
+        /* `complete` is also true for an image that failed or has not decoded yet, so
+           wait for load unless there are real pixel dimensions to read */
+        if (img.complete && img.naturalWidth) apply();
+        else {
+            img.addEventListener('load', apply, { once: true });
+            img.addEventListener('error', () => finish(false), { once: true });
+        }
+    }
+
+    /** Sizes images in content that arrived from outside the editor — a document saved
+     *  before the editor started recording image sizes. Without this such a document
+     *  keeps rendering at one size here and another in a sent mail. Images that already
+     *  carry a size, and template slots, are left alone, so content written by a
+     *  current version passes through untouched. Emits one change after the images have
+     *  settled rather than one per image, and none at all if nothing needed stamping. */
+    private stampExistingImages(): void {
+        const imgs = Array.from(this.ed.querySelectorAll('img'));
+        if (!imgs.length) return;
+        let waiting = imgs.length;
+        let changed = false;
+        const settle = (stamped: boolean) => {
+            if (stamped) changed = true;
+            if (--waiting === 0 && changed) this.onChange();
+        };
+        imgs.forEach((img) => this.stampImageSize(img as HTMLImageElement, settle));
     }
 
     private positionImgPhCtx(): void {
@@ -4213,6 +4316,14 @@ export class FableEditor implements FableEditorApi {
                 window.removeEventListener('mousemove', mv);
                 window.removeEventListener('mouseup', up);
                 restore();
+                /* mirror the final size onto the width attribute: Outlook desktop
+                   follows the attribute rather than the CSS, so without this a resized
+                   image still goes out at its original size */
+                const w = parseInt(img.style.width, 10);
+                if (w > 0 && !img.closest('.tpl-media')) {
+                    img.setAttribute('width', String(w));
+                    img.removeAttribute('height');
+                }
                 this.onChange();
             };
             window.addEventListener('mousemove', mv);
@@ -4419,7 +4530,7 @@ export class FableEditor implements FableEditorApi {
         if (imgItem && !html) {
             const fr = new FileReader();
             fr.onload = () => {
-                document.execCommand('insertHTML', false, `<img src="${fr.result}" alt="">`);
+                this.insertImageHTML(fr.result as string);
                 this.onChange();
             };
             fr.readAsDataURL(imgItem.getAsFile() as Blob);
@@ -4438,10 +4549,84 @@ export class FableEditor implements FableEditorApi {
             }
         }
         if (html) {
-            document.execCommand('insertHTML', false, cleanPastedHTML(html, this.dir()));
+            this.pasteRichHTML(html, cd, imgItem);
         } else {
             document.execCommand('insertHTML', false, normalizeTextPaste(cd.getData('text/plain')));
+            this.onChange();
         }
+    }
+
+    /** Rich-HTML paste. Before the (untouched) paste engine runs, pictures Word left
+     *  behind as unreadable file:// refs are pulled out of the clipboard's RTF flavor
+     *  and inlined — the same pairing TinyMCE PowerPaste does for
+     *  powerpaste_allow_local_images. Everything the engine already handled is
+     *  unaffected: with no RTF, or no recoverable picture, the HTML reaches it
+     *  byte-identical to before. */
+    private pasteRichHTML(html: string, cd: DataTransfer, imgItem?: DataTransferItem): void {
+        let injected: string[] = [];
+        const rtf = cd.getData('text/rtf');
+        if (rtf) {
+            const res = injectRtfImages(html, rtf);
+            html = res.html;
+            injected = res.injected;
+        }
+
+        /* Word always supplies text/html, so the bitmap-only branch in handlePaste
+           never fires for a Word paste. When exactly one image is still unresolved and
+           the clipboard carries that bitmap, use it instead of the placeholder. */
+        if (imgItem && countUnresolvedImages(html) === 1) {
+            const blob = imgItem.getAsFile();
+            if (blob) {
+                const pending = html;
+                this.saveSel();
+                const fr = new FileReader();
+                fr.onload = () => {
+                    const res = injectImages(pending, [fr.result as string]);
+                    this.finishRichPaste(res.html, injected.concat(res.injected), true);
+                };
+                fr.onerror = () => this.finishRichPaste(pending, injected, true);
+                fr.readAsDataURL(blob);
+                return;
+            }
+        }
+        this.finishRichPaste(html, injected);
+    }
+
+    /** Hands recovered pictures to the host's imageUploadHandler when one is
+     *  configured (PowerPaste's automatic_uploads equivalent), then inserts. Without a
+     *  handler they stay inline base64, which is what PowerPaste does by default. */
+    private finishRichPaste(html: string, injected: string[], deferred = false): void {
+        if (!this.imageUploadHandler || !injected.length) {
+            this.insertPastedHTML(html, deferred);
+            return;
+        }
+        const handler = this.imageUploadHandler;
+        const unique = injected.filter((src, i) => injected.indexOf(src) === i);
+        if (!deferred) this.saveSel();
+        Promise.all(
+            unique.map((src, i) => {
+                const file = dataUrlToFile(src, 'pasted-image-' + (i + 1));
+                if (!file) return Promise.resolve(src);
+                return handler(file).catch((err) => {
+                    this.onImageUploadError?.(err, file);
+                    return src; /* keep the inline copy so the picture is never lost */
+                });
+            })
+        ).then((urls) => {
+            let out = html;
+            unique.forEach((src, i) => {
+                if (urls[i] !== src) out = out.split(src).join(urls[i]);
+            });
+            this.insertPastedHTML(out, true);
+        });
+    }
+
+    /** `deferred` means the insert is happening after an async hop, so the caret the
+     *  paste started from has to be put back first. */
+    private insertPastedHTML(html: string, deferred = false): void {
+        if (deferred) this.restoreSel();
+        document.execCommand('insertHTML', false, cleanPastedHTML(html, this.dir()));
+        if (deferred) this.saveSel();
         this.onChange();
     }
 

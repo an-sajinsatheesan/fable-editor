@@ -1068,8 +1068,17 @@ function wordCountDlg(){
 }
 function previewDlg(){
   dialog(t('previewttl'), body=>{
+    /* The preview renders the document at the editor's own column width, so an image
+       is exactly the size the user left it at - a narrower preview pane would silently
+       shrink it and misreport what will be sent. The dialog gets a wider cap to make
+       that width reachable; on a viewport too small for it the image's max-width:100%
+       scales things down rather than clipping. */
+    const dlgEl=body.closest('.dlg'); if(dlgEl) dlgEl.classList.add('dlg-preview');
     const box=document.createElement('div');
-    box.style.cssText='width:640px;max-width:78vw;max-height:52vh;overflow:auto;border:1px solid #e3e3e3;border-radius:6px;padding:14px;font-family:Helvetica,Arial,sans-serif;font-size:14px';
+    box.className='pv-box';
+    const w=contentWidth();
+    box.style.cssText=`width:${w>0?Math.round(w):640}px;max-width:100%;max-height:52vh;overflow:auto;`+
+      'border:1px solid #e3e3e3;border-radius:6px;padding:14px;font-family:Helvetica,Arial,sans-serif;font-size:14px';
     box.innerHTML = ed.innerHTML; body.appendChild(box);
   });
 }
@@ -1119,8 +1128,7 @@ imgInput.addEventListener('change', ()=>{
      (in React, feed this into blobCache instead) */
   const fr=new FileReader();
   fr.onload=()=>{ restoreSel();
-    document.execCommand('insertHTML',false,
-      `<img src="${fr.result}" title="${file.name.replace(/"/g,'')}" alt="">`);
+    insertImageHTML(fr.result, file.name.replace(/"/g,''));
     onChange(); };
   fr.readAsDataURL(file);
 });
@@ -1237,8 +1245,73 @@ function replacePlaceholderWithImage(ph, src, title){
   const img=document.createElement('img');
   img.src=src; img.alt=''; if(title) img.title=title;
   ph.replaceWith(img);
+  stampImageSize(img);
   if(phActive===ph) clearImgPlaceholderSel();
   refreshState(); onChange();
+}
+/* width of the editor's text column - what `.earea img{max-width:100%}` clamps to */
+function contentWidth(){
+  const cs=getComputedStyle(ed);
+  const pad=(parseFloat(cs.paddingLeft)||0)+(parseFloat(cs.paddingRight)||0);
+  return Math.max(0, ed.clientWidth-pad);
+}
+/* Gives a newly inserted image an explicit size so it renders the same in the editor,
+   in Preview and in a sent email. Without it the image only looks right inside .earea,
+   whose max-width:100% rule exists nowhere else - which is why the same picture came
+   out at a different size once the mail was sent. Template media slots stay fluid, and
+   any size the source already carried wins. */
+function stampImageSize(img, onSettled){
+  const finish=stamped=>{
+    if(onSettled) onSettled(stamped);
+    else if(stamped) onChange();
+  };
+  const apply=()=>{
+    if(!ed.contains(img)) return finish(false);
+    if(img.closest('.tpl-media')) return finish(false);
+    if(img.getAttribute('width')||img.getAttribute('height')) return finish(false);
+    if(img.style.width||img.style.height) return finish(false);
+    const natural=img.naturalWidth;
+    if(!natural) return finish(false);
+    const max=contentWidth();
+    const w=Math.round(max>0 ? Math.min(natural,max) : natural);
+    img.setAttribute('width', String(w));
+    img.style.width=w+'px';
+    img.style.height='auto';
+    finish(true);
+  };
+  /* `complete` is also true for an image that failed or has not decoded yet, so wait
+     for load unless there are real pixel dimensions to read */
+  if(img.complete && img.naturalWidth) apply();
+  else {
+    img.addEventListener('load', apply, {once:true});
+    img.addEventListener('error', ()=>finish(false), {once:true});
+  }
+}
+/* Sizes images in content that arrived from outside the editor - a document saved
+   before the editor started recording image sizes. Without this such a document keeps
+   rendering at one size here and another in a sent mail. Images that already carry a
+   size, and template slots, are left alone. Emits one change after the images have
+   settled rather than one per image, and none at all if nothing needed stamping. */
+function stampExistingImages(){
+  const imgs=[...ed.querySelectorAll('img')];
+  if(!imgs.length) return;
+  let waiting=imgs.length, changed=false;
+  const settle=stamped=>{
+    if(stamped) changed=true;
+    if(--waiting===0 && changed) onChange();
+  };
+  imgs.forEach(img=>stampImageSize(img, settle));
+}
+/* Inserts an <img> through execCommand and stamps its size once it has decoded; the
+   throwaway id is the only handle on what insertHTML created. */
+function insertImageHTML(src, title){
+  const id='fable-img-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  document.execCommand('insertHTML',false,
+    `<img id="${id}" src="${src}"${title?` title="${title}"`:''} alt="">`);
+  const img=ed.querySelector('#'+id);
+  if(!img) return;
+  img.removeAttribute('id');
+  stampImageSize(img);
 }
 function positionImgPhCtx(){
   if(phActive && !document.body.contains(phActive)){ clearImgPlaceholderSel(); return; }
@@ -2258,7 +2331,7 @@ function onChange(){
   /* console.log(getContent()); */
 }
 window.getContent = ()=>ed.innerHTML;
-window.setContent = h=>{ ed.innerHTML=h||'<p><br></p>'; refreshState(); clearTableHandles(); };
+window.setContent = h=>{ ed.innerHTML=h||'<p><br></p>'; refreshState(); clearTableHandles(); stampExistingImages(); };
 
 /* email-export direction detection - used only by getContentForEmail(). Content
    pasted from Word/Outlook usually carries explicit dir="rtl"/"ltr" per
@@ -2335,6 +2408,23 @@ window.getContentForEmail = function(){
     el.setAttribute('dir', d);
     const hasAlign=/text-align\s*:/i.test(el.getAttribute('style')||'');
     setStyle(el, hasAlign ? `direction:${d}` : `direction:${d};text-align:${d==='rtl'?'right':'left'}`);
+  });
+
+  /* Images: an email carries none of the editor's CSS, so an image with no explicit
+     size renders at its raw pixel size in the mail client. Take the size it actually
+     has on screen from the live editor (index-matched - the clone was built from the
+     same HTML) and make it explicit. The width attribute is what Outlook desktop
+     follows; max-width keeps it inside narrow mobile clients. Documents saved before
+     this existed are fixed here too, without rewriting anything already stored. */
+  const liveImgs = ed.querySelectorAll('img');
+  box.querySelectorAll('img').forEach((img,i)=>{
+    if(img.closest('.tpl-media')) return;
+    const live=liveImgs[i];
+    const w=Math.round((live&&live.getBoundingClientRect().width)||0);
+    if(w>0 && !img.getAttribute('width')) img.setAttribute('width', String(w));
+    if(w>0 && !/(^|;)\s*width\s*:/i.test(img.getAttribute('style')||'')) setStyle(img, `width:${w}px`);
+    if(!/max-width\s*:/i.test(img.getAttribute('style')||'')) setStyle(img,'max-width:100%');
+    if(!/(^|;)\s*height\s*:/i.test(img.getAttribute('style')||'')) setStyle(img,'height:auto');
   });
 
   const dir = found || ed.getAttribute('dir') || t('dir');
@@ -2637,6 +2727,188 @@ function cleanPastedHTML(raw){
 }
 window.cleanPastedHTML = cleanPastedHTML;
 
+/* =====================================================================
+   WORD LOCAL IMAGES  (clipboard RTF flavor -> data: URI)
+   Word writes <img src="file:///.../clip_image001.png"> - an unreadable local temp
+   file - but the same paste carries a text/rtf flavor with every picture embedded as
+   hex in a {\pict} group. Pairing the two is how PowerPaste implements
+   powerpaste_allow_local_images. This runs BEFORE cleanPastedHTML(), which already
+   allows data: URIs, so the paste engine itself is untouched.
+   ===================================================================== */
+const RTF_MAX_TOTAL_BYTES = 10*1024*1024;
+const RTF_USABLE_SRC = /^(https?:|data:image\/|blob:)/i;
+
+/* brace-depth scanner: a lazy /\{\\pict[\s\S]*?\}/ regex stops at the nested
+   {\*\picprop} group and truncates the hex payload */
+function rtfFindGroups(rtf, keyword){
+  const out=[], needle='{\\'+keyword;
+  let i=0;
+  while((i=rtf.indexOf(needle,i))!==-1){
+    const after=rtf[i+needle.length];
+    if(after && /[a-z0-9]/i.test(after)){ i+=needle.length; continue; }
+    let depth=0, j=i;
+    for(;j<rtf.length;j++){
+      const c=rtf[j];
+      if(c==='\\'){ j++; continue; }
+      if(c==='{') depth++;
+      else if(c==='}'){ depth--; if(!depth) break; }
+    }
+    out.push({start:i, end:j+1, body:rtf.slice(i+needle.length, j)});
+    i=j+1;
+  }
+  return out;
+}
+function rtfHexToBytes(hex){
+  const bytes=new Uint8Array(hex.length/2);
+  for(let i=0;i<bytes.length;i++) bytes[i]=parseInt(hex.substr(i*2,2),16);
+  return bytes;
+}
+function rtfToBase64(bytes){
+  let bin='';
+  for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function rtfIndexOfSig(bytes, sig){
+  outer: for(let i=0;i+sig.length<=bytes.length;i++){
+    for(let j=0;j<sig.length;j++) if(bytes[i+j]!==sig[j]) continue outer;
+    return i;
+  }
+  return -1;
+}
+function rtfDecodePict(body){
+  let kind=null;
+  if(/\\pngblip/.test(body)) kind='image/png';
+  else if(/\\jpegblip/.test(body)) kind='image/jpeg';
+  else if(/\\wmetafile\d*/.test(body)||/\\emfblip/.test(body)) kind='metafile';
+  if(!kind) return null;
+  let hex=body.replace(/\{[^{}]*\}/g,'').replace(/\\[a-z]+-?\d*\s?/gi,'').replace(/[^0-9a-fA-F]/g,'');
+  if(hex.length%2) hex=hex.slice(0,-1);
+  if(!hex) return null;
+  const bytes=rtfHexToBytes(hex);
+  if(kind==='metafile'){
+    /* Word wraps a bitmap in a metafile for compatibility; use it when there is a
+       real PNG/JPEG inside. A genuine vector metafile we cannot render. */
+    const png=rtfIndexOfSig(bytes,[0x89,0x50,0x4e,0x47]);
+    if(png>=0) return 'data:image/png;base64,'+rtfToBase64(bytes.slice(png));
+    const jpg=rtfIndexOfSig(bytes,[0xff,0xd8,0xff]);
+    if(jpg>=0) return 'data:image/jpeg;base64,'+rtfToBase64(bytes.slice(jpg));
+    return null;
+  }
+  return 'data:'+kind+';base64,'+rtfToBase64(bytes);
+}
+function extractRtfImages(rtf){
+  if(!rtf || rtf.indexOf('\\pict')===-1) return [];
+  /* {\*\shppict{\pict ...}}{\nonshppict{\pict ...}} - the second is a legacy duplicate;
+     dropping it keeps picture order aligned with the <img> tags in the HTML flavor */
+  let cleaned=rtf;
+  rtfFindGroups(rtf,'nonshppict').reverse().forEach(g=>{
+    cleaned=cleaned.slice(0,g.start)+cleaned.slice(g.end);
+  });
+  let budget=RTF_MAX_TOTAL_BYTES;
+  return rtfFindGroups(cleaned,'pict').map(g=>{
+    if(budget<=0) return null;
+    const data=rtfDecodePict(g.body);
+    if(data) budget-=data.length*0.75;
+    return data;
+  });
+}
+/* Images that already have a usable src keep it and do not consume a picture slot, so
+   a mixed paste (webmail image + Word image) stays aligned. */
+function injectImages(html, imgs){
+  if(!html || !imgs.length) return {html, injected:[]};
+  const injected=[];
+  let next=0;
+  const out=html.replace(/<img\b[^>]*>/gi, tag=>{
+    const src=(tag.match(/\ssrc\s*=\s*["']?([^"'\s>]+)/i)||[])[1]||'';
+    if(RTF_USABLE_SRC.test(src)) return tag;
+    const data=imgs[next++];
+    if(!data) return tag;
+    injected.push(data);
+    return /\ssrc\s*=\s*["']/i.test(tag)
+      ? tag.replace(/(\ssrc\s*=\s*)(["'])[^"']*\2/i, '$1"'+data+'"')
+      : tag.replace(/(\ssrc\s*=\s*)[^\s>]+/i, '$1"'+data+'"');
+  });
+  return {html:out, injected};
+}
+function injectRtfImages(html, rtf){
+  if(!html || !rtf) return {html, injected:[]};
+  return injectImages(html, extractRtfImages(rtf));
+}
+function countUnresolvedImages(html){
+  const tags=html.match(/<img\b[^>]*>/gi);
+  if(!tags) return 0;
+  return tags.filter(tag=>{
+    const src=(tag.match(/\ssrc\s*=\s*["']?([^"'\s>]+)/i)||[])[1]||'';
+    return !RTF_USABLE_SRC.test(src);
+  }).length;
+}
+function dataUrlToFile(dataUrl, baseName){
+  const m=dataUrl.match(/^data:([^;,]+);base64,(.*)$/);
+  if(!m) return null;
+  const ext=(m[1].split('/')[1]||'png').replace(/[^a-z0-9]/gi,'')||'png';
+  try{
+    const bin=atob(m[2]);
+    const bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+    return new File([bytes], baseName+'.'+(ext==='jpeg'?'jpg':ext), {type:m[1]});
+  }catch(e){ return null; }
+}
+window.extractRtfImages = extractRtfImages;
+window.injectRtfImages = injectRtfImages;
+
+function insertPastedHTML(html, deferred){
+  if(deferred) restoreSel();
+  document.execCommand('insertHTML',false,cleanPastedHTML(html));
+  if(deferred) saveSel();
+  onChange();
+}
+/* Recovered pictures go through the host's upload handler when one is configured
+   (PowerPaste's automatic_uploads equivalent); without one they stay inline base64,
+   which is what PowerPaste does by default. */
+function finishRichPaste(html, injected, deferred){
+  const handler = typeof window.fableEditorImageUploadHandler === 'function'
+    ? window.fableEditorImageUploadHandler : null;
+  if(!handler || !injected.length){ insertPastedHTML(html, deferred); return; }
+  const unique=injected.filter((src,i)=>injected.indexOf(src)===i);
+  if(!deferred) saveSel();
+  Promise.all(unique.map((src,i)=>{
+    const file=dataUrlToFile(src,'pasted-image-'+(i+1));
+    if(!file) return Promise.resolve(src);
+    return Promise.resolve().then(()=>handler(file)).catch(err=>{
+      console.error('image upload failed', err);
+      return src;  /* keep the inline copy so the picture is never lost */
+    });
+  })).then(urls=>{
+    let out=html;
+    unique.forEach((src,i)=>{ if(urls[i]!==src) out=out.split(src).join(urls[i]); });
+    insertPastedHTML(out, true);
+  });
+}
+function pasteRichHTML(html, cd, imgItem){
+  let injected=[];
+  const rtf=cd.getData('text/rtf');
+  if(rtf){ const res=injectRtfImages(html, rtf); html=res.html; injected=res.injected; }
+  /* Word always supplies text/html, so the bitmap-only branch never fires for a Word
+     paste. When exactly one image is still unresolved and the clipboard carries that
+     bitmap, use it instead of the placeholder. */
+  if(imgItem && countUnresolvedImages(html)===1){
+    const blob=imgItem.getAsFile();
+    if(blob){
+      const pending=html;
+      saveSel();
+      const fr=new FileReader();
+      fr.onload=()=>{
+        const res=injectImages(pending,[fr.result]);
+        finishRichPaste(res.html, injected.concat(res.injected), true);
+      };
+      fr.onerror=()=>finishRichPaste(pending, injected, true);
+      fr.readAsDataURL(blob);
+      return;
+    }
+  }
+  finishRichPaste(html, injected, false);
+}
+
 ed.addEventListener('paste', e=>{
   const cd=e.clipboardData; if(!cd) return;
   e.preventDefault();
@@ -2644,8 +2916,7 @@ ed.addEventListener('paste', e=>{
   const imgItem=[...cd.items].find(i=>i.type.startsWith('image/'));
   if(imgItem && !html){                 /* paste_data_images:true */
     const fr=new FileReader();
-    fr.onload=()=>{ document.execCommand('insertHTML',false,
-      `<img src="${fr.result}" alt="">`); onChange(); };
+    fr.onload=()=>{ insertImageHTML(fr.result); onChange(); };
     fr.readAsDataURL(imgItem.getAsFile());
     return;
   }
@@ -2658,7 +2929,8 @@ ed.addEventListener('paste', e=>{
     if(embed){ document.execCommand('insertHTML',false,videoEmbedHTML(embed)); onChange(); return; }
   }
   if(html){
-    document.execCommand('insertHTML',false,cleanPastedHTML(html));
+    pasteRichHTML(html, cd, imgItem);
+    return;
   }else{
     const txt=normalizeArabicPresentation(cd.getData('text/plain')).replace(/\r/g,'');
     const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -2699,4 +2971,5 @@ document.getElementById('langAr').addEventListener('click', function(){
   document.getElementById('langEn').classList.remove('on'); initUI();
 });
 initUI();
+stampExistingImages();
 })();
