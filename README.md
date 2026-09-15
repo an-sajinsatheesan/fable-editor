@@ -174,6 +174,34 @@ Use in a template:
 
 Inputs: `language`, `height`, `menubar`, `toolbar`, `statusbar`, `readonly`, `primaryColor`, `toolbarGroupBackground`, `uiFontFamily`, `init`. `menubar`/`toolbar` accept a string directly (e.g. `[toolbar]="'undo redo | bold italic'"`); `fontFamilyFormats`, `contentStyle`, `imageFileTypes`, `imageUploadHandler`, `onImageUploadError`, `videoFileTypes`, `videoUploadHandler`, and `onVideoUploadError` aren't top-level inputs — pass them via `[init]="{ contentStyle: '...' }"` (see the [`init` options](#init-options) table above). Outputs: `editorChange`, `editorReady`. Works with `ngModel` and `formControlName`.
 
+## Stacking (z-index)
+
+The editor's floating UI — context toolbars, menus, dialogs and the image/table resize grips — is appended to `document.body` rather than to the editor container. That keeps it from being clipped by an `overflow` somewhere in the host's layout, but it also means it has to out-stack the host application's own chrome.
+
+Every layer derives from one custom property, `--fable-z` (default `1000`):
+
+| Offset | Layer | Classes |
+|---|---|---|
+| `+140` | Table column bar | `.tbl-colbar` |
+| `+144` | Table op marker | `.tbl-opmark` |
+| `+145` | Table cell marker | `.tbl-cellmark` |
+| `+150` | Resize grips | `.img-handle`, `.tbl-handle` |
+| `+160` | Context toolbars | `.imgctx`, `.selctx`, `.tblctx` |
+| `+200` | Menus | `.pop` |
+| `+210` | Submenus | `.pop.sub` |
+| `+500` | Dialog overlay | `.ovl` (contains `.dlg`) |
+| — | Tooltips | `.etip` — pinned above everything, not derived |
+
+With the default the stack occupies **1000–1500**. If your app puts modals, drawers or snackbars at or above that — Material UI's defaults start at 1200, Bootstrap's modal is 1055 — the editor's floating UI ends up behind them. The clearest symptom is image and table resizing: the grips sit lowest in the stack, so they are the first to disappear, while the context toolbar just above them still shows and makes it look like only resize is broken.
+
+Lift the whole stack with one declaration:
+
+```css
+:root { --fable-z: 999000; }
+```
+
+The relative order is preserved, so grips stay under their own toolbar and dialogs stay on top. Prefer this over overriding the classes one by one: that list grows as the editor gains features, and a class you miss fails silently — nothing errors, the element is simply never visible.
+
 ## Development & testing
 
 ```bash
@@ -213,6 +241,7 @@ examples/
   angular/      # runnable Angular CLI test app
 demo/
   index.html    # manual vanilla test page
+  demo.css      # demo-page chrome (not shipped in the package)
 test/
   core.test.ts  # automated core tests
 ```

@@ -1,0 +1,43 @@
+/* Demo page chrome only — NOT part of the library.
+   These style the demo harness (page background, .demo wrapper, .demo-bar
+   buttons). They live here rather than in src/core/editor.css because a
+   library stylesheet must never restyle a host application's <body>. */
+
+          /* ================= page ================= */
+          body {
+               margin: 0;
+               background: #f1f3f6;
+               font-family: var(--fable-ui-font, 'Noto Sans', 'Segoe UI', system-ui, Arial, sans-serif);
+               color: #222f3e;
+          }
+
+          .demo {
+               max-width: 1180px;
+               margin: 26px auto;
+               padding: 0 18px;
+          }
+
+          .demo-bar {
+               display: flex;
+               gap: 8px;
+               align-items: center;
+               margin-bottom: 14px;
+               font-size: 13.5px;
+               color: #556
+          }
+
+          .demo-bar button {
+               border: 1px solid #cfd6df;
+               background: #fff;
+               border-radius: 6px;
+               padding: 6px 14px;
+               font-size: 13px;
+               font-family: inherit;
+               cursor: pointer
+          }
+
+          .demo-bar button.on {
+               background: var(--fable-primary, #df3c2b);
+               border-color: var(--fable-primary, #df3c2b);
+               color: #fff
+          }

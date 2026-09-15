@@ -1,41 +1,21 @@
-          /* ================= page ================= */
-          body {
-               margin: 0;
-               background: #f1f3f6;
-               font-family: var(--fable-ui-font, 'Noto Sans', 'Segoe UI', system-ui, Arial, sans-serif);
-               color: #222f3e;
-          }
+/* FableEditor core stylesheet.
 
-          .demo {
-               max-width: 1180px;
-               margin: 26px auto;
-               padding: 0 18px;
-          }
+   Floating UI — context toolbars, menus, dialogs and resize grips — is appended
+   to document.body, so it has to out-stack the host application's chrome. Every
+   such layer derives from one base, --fable-z (default 1000), which keeps the
+   internal order intact while letting a host lift the whole stack at once:
 
-          .demo-bar {
-               display: flex;
-               gap: 8px;
-               align-items: center;
-               margin-bottom: 14px;
-               font-size: 13.5px;
-               color: #556
-          }
+       +140  table column bar        +200  menus
+       +144  table op marker         +210  submenus
+       +145  table cell marker       +500  dialog overlay
+       +150  resize grips            (.etip tooltips stay pinned above all)
+       +160  context toolbars
 
-          .demo-bar button {
-               border: 1px solid #cfd6df;
-               background: #fff;
-               border-radius: 6px;
-               padding: 6px 14px;
-               font-size: 13px;
-               font-family: inherit;
-               cursor: pointer
-          }
+   An app whose modals or drawers sit above 1000 needs one declaration rather
+   than an !important override per class:
 
-          .demo-bar button.on {
-               background: var(--fable-primary, #df3c2b);
-               border-color: var(--fable-primary, #df3c2b);
-               color: #fff
-          }
+       :root { --fable-z: 999000; }
+*/
 
           /* ================= editor shell (oxide-like skin) ================= */
           .tox {
@@ -52,7 +32,7 @@
           .tox.fullscreen {
                position: fixed;
                inset: 0;
-               z-index: 1000;
+               z-index: var(--fable-z, 1000);
                border-radius: 0;
           }
 
@@ -586,14 +566,14 @@
                border: 1px solid #fff;
                border-radius: 2px;
                box-shadow: 0 0 0 1px rgba(34, 47, 62, .25);
-               z-index: 1150;
+               z-index: calc(var(--fable-z, 1000) + 150);
           }
 
           .tbl-colbar {
                position: absolute;
                width: 7px;
                margin-inline-start: -3px;
-               z-index: 1140;
+               z-index: calc(var(--fable-z, 1000) + 140);
                cursor: col-resize;
                border-radius: 2px;
           }
@@ -609,7 +589,7 @@
                pointer-events: none;
                border: 1.5px solid var(--fable-primary, #df3c2b);
                border-radius: 1px;
-               z-index: 1145;
+               z-index: calc(var(--fable-z, 1000) + 145);
           }
 
           /* dashed highlight over the row/column a hovered operation targets */
@@ -619,7 +599,7 @@
                border: 1.5px dashed var(--fable-primary, #df3c2b);
                background: rgba(0, 108, 231, .07);
                border-radius: 2px;
-               z-index: 1144;
+               z-index: calc(var(--fable-z, 1000) + 144);
           }
 
           .tblctx {
@@ -631,7 +611,7 @@
                border-radius: 8px;
                box-shadow: 0 4px 14px rgba(34, 47, 62, .18), 0 0 0 1px rgba(34, 47, 62, .06);
                padding: 4px;
-               z-index: 1160;
+               z-index: calc(var(--fable-z, 1000) + 160);
           }
 
           .tblctx button {
@@ -766,7 +746,7 @@
                border: 1px solid #fff;
                border-radius: 2px;
                box-shadow: 0 0 0 1px rgba(34, 47, 62, .25);
-               z-index: 1150;
+               z-index: calc(var(--fable-z, 1000) + 150);
           }
 
           .img-handle-nw,
@@ -788,7 +768,7 @@
                border-radius: 8px;
                box-shadow: 0 4px 14px rgba(34, 47, 62, .18), 0 0 0 1px rgba(34, 47, 62, .06);
                padding: 4px;
-               z-index: 1160;
+               z-index: calc(var(--fable-z, 1000) + 160);
           }
 
           .imgctx button {
@@ -863,7 +843,7 @@
                border-radius: 8px;
                box-shadow: 0 4px 14px rgba(34, 47, 62, .18), 0 0 0 1px rgba(34, 47, 62, .06);
                padding: 4px;
-               z-index: 1160;
+               z-index: calc(var(--fable-z, 1000) + 160);
           }
 
           .selctx button {
@@ -976,7 +956,7 @@
           /* ================= popups / menus ================= */
           .pop {
                position: absolute;
-               z-index: 1200;
+               z-index: calc(var(--fable-z, 1000) + 200);
                background: #fff;
                border-radius: 8px;
                padding: 6px;
@@ -1056,7 +1036,7 @@
 
           /* flyout submenus */
           .pop.sub {
-               z-index: 1210;
+               z-index: calc(var(--fable-z, 1000) + 210);
           }
 
           .pop .mi .subarrow {
@@ -1457,7 +1437,7 @@
                position: fixed;
                inset: 0;
                background: rgba(34, 47, 62, .5);
-               z-index: 1500;
+               z-index: calc(var(--fable-z, 1000) + 500);
                display: flex;
                align-items: flex-start;
                justify-content: center;

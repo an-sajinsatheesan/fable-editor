@@ -3,6 +3,36 @@
 All notable changes to this project are documented here. Format loosely
 follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.5.0]
+
+### Added
+
+- **One custom property now drives the whole floating-UI stack.** Context
+  toolbars, menus, dialogs and the image/table resize grips are appended to
+  `document.body`, so they have to out-stack whatever chrome the host
+  application already has. Their z-indexes were hard-coded between 1000 and
+  1500; they now derive from `--fable-z` (default `1000`), which keeps every
+  current value and the internal order exactly as they were. An app whose
+  modals or drawers sit in that range lifts the entire stack with
+  `:root { --fable-z: 999000 }` instead of maintaining an `!important`
+  override per class - a list that grows with the editor and fails silently
+  whenever one is missed. The grips are the lowest layer, so they are the
+  first thing to vanish while the context toolbar just above them still
+  shows, which makes the symptom read as "only resize is broken". The layer
+  table is in the README under *Stacking (z-index)*.
+
+### Fixed
+
+- **The stylesheet restyled the host page's `<body>`.** `editor.css` was lifted
+  out of the standalone demo and still carried that page's own chrome: a `body`
+  rule setting background, font and colour, plus the `.demo` and `.demo-bar`
+  wrapper styles. Every application that imported `fable-editor/style.css` had
+  its body repainted `#f1f3f6` and its text recoloured `#222f3e`, whether or
+  not the editor was on screen. Those rules have moved to `demo/demo.css`,
+  which only the demo page loads, so the published stylesheet no longer styles
+  anything outside the editor. Apps that were unknowingly relying on that
+  background now fall back to their own.
+
 ## [1.4.0]
 
 ### Added
